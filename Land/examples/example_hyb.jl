@@ -323,6 +323,7 @@ function run_time_step!(spac::SPACMono{FT}, dfr::DataFrameRow, beta::BetaGLinear
 
     # save the total flux into the DataFrame
     dfr.F_H2O = T_VEG(spac);
+    print(T_VEG(spac))
     dfr.F_CO2 = CNPP(spac);
     dfr.F_GPP = GPP(spac);
 
