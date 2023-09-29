@@ -8,7 +8,7 @@
 3) ``` cd examples```
 4) Edit relevant dirs in ``` example.jl ``` for input dataset  ```debug.nc``` and ```debug.jld2```, and specify output path.
 5) Also edit paths to include files in ```CLiMA-Hybrid/Land/src/StomataModels/model/empirical.jl``` that refer to the Hybrid model files.
-6) ``` include("example.jl") ``` for standard CLiMA run.
+6)  ``` include("example.jl") ``` for standard CLiMA run.
 
 ### To run hybrid model:
 1) ``` cd CLiMA-Hybrid/src/Hybrid_model  ```
