@@ -166,17 +166,22 @@ function stomatal_conductance(model::ESMMedlyn{FT}, canopyi::CanopyLayer{FT}, en
     return g0 + p_atm * FT(1e-6) / p_a * (1 + g1/sqrt(vpd)) * β * An[ind] * FT(1.6)
 end
 
+relative_path = "../../../../Hybrid_model/src/"
 
-include("/Net/Groups/BGI/people/relghawi/Julia_hyb/Clima-Hyb2/Hybrid_model/src/prep_data.jl")
-include("/Net/Groups/BGI/people/relghawi/Julia_hyb/Clima-Hyb2/Hybrid_model/src/data.jl")
-include("/Net/Groups/BGI/people/relghawi/Julia_hyb/Clima-Hyb2/Hybrid_model/src/model_64.jl")
-include("/Net/Groups/BGI/people/relghawi/Julia_hyb/Clima-Hyb2/Hybrid_model/src/losses.jl")
+include(joinpath(@__DIR__, relative_path, "prep_data.jl"))
+include(joinpath(@__DIR__, relative_path, "data.jl"))
+include(joinpath(@__DIR__, relative_path, "model_64.jl"))
+include(joinpath(@__DIR__, relative_path, "losses.jl"))
+
+
 using Flux, JLD2
 
 const predictors = [:T_AIR, :RAD, :SWC_1, :LAIx, :p_sat, :p_H2O, :p_atm, :LA]
 const x = [:LAIx, :p_sat, :p_H2O, :p_atm, :LA] # Assuming as independent variables
 const hybrid_model = LinearHybridModel(predictors, x, 1, 64)
-const model_state = JLD2.load("/Net/Groups/BGI/people/relghawi/Julia_hyb/Clima-Hyb2/Hybrid_model/src/hybrid_clima.jld2", "model_state")
+
+const model_state_path = joinpath(@__DIR__, relative_path, "hybrid_clima.jld2")
+const model_state = JLD2.load(model_state_path, "model_state")
 Flux.loadmodel!(hybrid_model, model_state)
 
 
