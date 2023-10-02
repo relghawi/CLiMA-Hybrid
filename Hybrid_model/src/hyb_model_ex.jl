@@ -1,11 +1,13 @@
+relative_path = "../../Land/examples/"
+
 include("prep_data.jl")
 include("data.jl")
 include("model_64.jl")
 include("losses.jl")
 using JLD2
 
-dict = load("/Net/Groups/BGI/people/relghawi/Julia_hyb/Clima-Hyb2/Land/examples/debug.jld2")
-wd_file ="/Net/Groups/BGI/people/relghawi/Julia_hyb/Clima-Hyb2/Land/examples/clima_ds_full.nc"
+dict = load(joinpath(@__DIR__, relative_path, "debug.jld2"))
+wd_file =joinpath(@__DIR__, relative_path, "clima_ds_full.nc")
 df = prepare_wd(dict, wd_file)
 
 # Specify predictors and target based on DataFrame columns
@@ -29,7 +31,9 @@ for epoch in 1:1
 end
 
 model_state = Flux.state(model);
-jldsave("/Net/Groups/BGI/people/relghawi/Julia_hyb/Clima-Hyb2/Hybrid_model/src/hybrid_clima.jld2"; model_state)
+jldsave(joinpath(@__DIR__,"hybrid_clima.jld2"); model_state)
+
+
 
 # Flux.testmode!(loss,true)
 
@@ -42,4 +46,4 @@ data_df = DataFrame(data_matrix, Symbol.(column_names))
 
 # Save predictions to an nc file
 α, ŷ = model(data_df, Val(:infer))
-save_predictions_to_nc(α, ŷ, "/Net/Groups/BGI/people/relghawi/Julia_hyb/Clima-Hyb2/Hybrid_model/src/predictions2.nc")
+save_predictions_to_nc(α, ŷ, joinpath(@__DIR__,"predictions2.nc"))
