@@ -162,7 +162,6 @@ function stomatal_conductance(model::ESMMedlyn{FT}, canopyi::CanopyLayer{FT}, en
     @unpack An, p_sat         = canopyi;
     @unpack p_a, p_atm, p_H₂O = envir;
     vpd = max(FT(0.001), p_sat - p_H₂O);
-
     return g0 + p_atm * FT(1e-6) / p_a * (1 + g1/sqrt(vpd)) * β * An[ind] * FT(1.6)
 end
 
@@ -187,11 +186,11 @@ Flux.loadmodel!(hybrid_model, model_state)
 
 function stomatal_conductance(model::ESMMedlyn_hybrid{FT}, canopyi::CanopyLayer{FT}, envir::AirLayer{FT}, β::FT, ind::Int) where {FT<:AbstractFloat}
     @unpack g0, g1            = model;
-    @unpack An, p_sat         = canopyi;
-    @unpack p_a, p_atm, p_H₂O = envir;
+    @unpack An, p_sat, LA,LAIx  = canopyi;
+    @unpack p_a, p_atm, p_H₂O,t_air = envir;
     vpd = max(FT(0.001), p_sat - p_H₂O);
-
-    d_vali2= [p_sat, p_sat, p_sat, p_sat, p_sat, p_sat, p_sat, p_sat]
+    println(p_sat)
+    d_vali2= [t_air, p_sat, p_sat, LAIx, p_sat, p_H₂O,p_atm,LA]
     column_names = [:T_AIR, :RAD, :SWC_1, :LAIx, :p_sat, :p_H2O, :p_atm, :LA]
 
     # Reshape the data into a 1xN matrix, where N is the number of columns

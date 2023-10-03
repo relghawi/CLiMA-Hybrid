@@ -26,7 +26,7 @@ loss(data) = loss(model, data)
 # Train the model
 opt = ADAM(0.00001,(0.9, 0.999))
 
-for epoch in 1:1
+for epoch in 1:2
     Flux.train!(loss, Flux.params(model), trainloader, opt,cb = Flux.throttle(() -> println("training"), 10)) #,cb = Flux.throttle(() -> println("training"), 10)
 end
 
@@ -45,5 +45,5 @@ data_matrix = reshape(d_vali2, 1, :)
 data_df = DataFrame(data_matrix, Symbol.(column_names))
 
 # Save predictions to an nc file
-α, ŷ = model(data_df, Val(:infer))
+α, ŷ = model(d_vali2, Val(:infer))
 save_predictions_to_nc(α, ŷ, joinpath(@__DIR__,"predictions2.nc"))

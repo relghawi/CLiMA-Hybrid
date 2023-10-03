@@ -18,7 +18,7 @@ function DenseNN(in_dim, out_dim, neurons)
         BatchNorm(in_dim),
         Dense(in_dim => neurons, relu),
         Dense(neurons => neurons, relu),
-        Dense(neurons => out_dim,softplus), vshape
+        Dense(neurons => out_dim,sigmoid), vshape
         )
 end
 
@@ -34,7 +34,7 @@ function (lhm::LinearHybridModel)(df)
     x_matrix = select_predictors(df, lhm.predictors)
     α = lhm.DenseLayers(x_matrix)
     (LAIx, p_sat, p_H2O, p_atm, LA) = select_variable(df, lhm.x)
-    ŷ = α .* (p_sat - p_H2O) ./ p_atm .* LA ### F_H2O = g_lw * (p_sat-p_H2O)/p_atm * LA ## Medlyns model
+    ŷ = α #.* (p_sat - p_H2O) ./ p_atm .* LA ### F_H2O = g_lw * (p_sat-p_H2O)/p_atm * LA ## Medlyns model
     #ŷ = α
     return (; α, ŷ)
 end
