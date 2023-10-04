@@ -2,6 +2,12 @@
 
 ## Repository to run CLiMA-Hybrid model
 
+Just activate the environment in the root folder and do:
+
+```julia
+] add https://github.com/lazarusA/Land.git#single_site
+```
+
 ### To run CLiMA independently:
 1) ``` cd CLiMA-Hybrid/Land  ```
 2) Initialize Julia REPL, and activate Julia env, and download needed packages.
