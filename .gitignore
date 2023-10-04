@@ -1,3 +1,4 @@
 .vscode
 *.nc
 Manifest.toml
+*.jld2
