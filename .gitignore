@@ -2,3 +2,4 @@
 *.nc
 Manifest.toml
 *.jld2
+.DS_Store
