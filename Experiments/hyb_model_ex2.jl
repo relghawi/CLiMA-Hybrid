@@ -1,14 +1,14 @@
-relative_path = "../../Land/examples/"
+relative_path = "./ClimaLand_examples/"
 
-include("prep_data.jl")
-include("data.jl")
-include("model_64.jl")
+include("../DataUtils/prep_data.jl")
+include("../DataUtils/data.jl")
+include("../HybridModels/model_64.jl")
 
 using JLD2
 import ProgressMeter: BarGlyphs, next!, Progress
 
-dict = load(joinpath(@__DIR__, relative_path, "debug.jld2"))
-wd_file =joinpath(@__DIR__, relative_path, "clima_ds_full.nc")
+dict = load(joinpath(relative_path, "debug.jld2"))
+wd_file =joinpath(relative_path, "clima_ds_full.nc")
 df = prepare_wd(dict, wd_file)
 
 # Specify predictors and target based on DataFrame columns
