@@ -362,8 +362,6 @@ function run_model!(spac::SPACMono{FT}, df::DataFrame, nc_out::String) where {FT
     return nothing
 end
 
-
-
 @time dict = load(joinpath(@__DIR__, "debug.jld2"));
 @time wddf = prepare_wd(dict, joinpath(@__DIR__, "debug.nc"));
 @time spac = prepare_spac(dict);
