@@ -31,6 +31,7 @@ end
 # let's multi dispatch
 
 function (lhm::LinearHybridModel)(df)
+    df = Float32.(df)
     x_matrix = select_predictors(df, lhm.predictors)
     α = lhm.DenseLayers(x_matrix)
     (LAIx, p_sat, p_H2O, p_atm, LA) = select_variable(df, lhm.x)
@@ -40,11 +41,13 @@ function (lhm::LinearHybridModel)(df)
 end
 
 function (lhm::LinearHybridModel)(df, ::Val{:infer})
+    df = Float32.(df)
     α, ŷ =  lhm(df)
     return α, ŷ
 end
 
 function (lhm::LinearHybridModel)(df, infer::Symbol)
+    df = Float32.(df)
     α, ŷ = lhm(df, Val(infer))
     return α, ŷ
 end

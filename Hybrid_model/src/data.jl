@@ -114,3 +114,32 @@ function split_data(df, target, predictors, x; f = 0.8, batchsize=32, shuffle=tr
     valloader = Flux.DataLoader(data_v; batchsize=length(y), shuffle=false, partial=false)
     return trainloader, valloader, trainall, d_train, d_vali
 end
+
+function split_data(df, target, predictors, x; f = 0.8, v = 0.1, batchsize=32, shuffle=true, partial=true)
+    d_train, d_temp = partition(df, f; shuffle)
+    d_vali, d_test = partition(d_temp, v / (1 - f); shuffle)
+    
+    # Wrap training data into Flux.DataLoader
+    df_train = select_cols(d_train, predictors, x)
+    df_train = tokeyedArray(df_train)
+    y_train = getproperty(d_train, target)
+    data_train = (; df = df_train, y = y_train)
+    trainloader = Flux.DataLoader(data_train; batchsize, shuffle, partial)
+    trainall = Flux.DataLoader(data_train; batchsize=length(y_train), shuffle, partial)
+    
+    # Wrap validation data into Flux.DataLoader
+    df_vali = select_cols(d_vali, predictors, x)
+    df_vali = tokeyedArray(df_vali)
+    y_vali = getproperty(d_vali, target)
+    data_vali = (; df = df_vali, y = y_vali)
+    valloader = Flux.DataLoader(data_vali; batchsize=length(y_vali), shuffle=false, partial=false)
+    
+    # Wrap test data into Flux.DataLoader
+    df_test = select_cols(d_test, predictors, x)
+    df_test = tokeyedArray(df_test)
+    y_test = getproperty(d_test, target)
+    data_test = (; df = df_test, y = y_test)
+    testloader = Flux.DataLoader(data_test; batchsize=length(y_test), shuffle=false, partial=false)
+    
+    return trainloader, valloader, testloader, trainall, d_train, d_vali, d_test
+end
