@@ -15,7 +15,7 @@ using Land.Photosynthesis: C3CLM, use_clm_td!
 using Land.PlantHydraulics: VanGenuchten, create_tree
 using Land.SoilPlantAirContinuum: CNPP, GPP, PPAR, SPACMono, T_VEG, initialize_spac_canopy!, prescribe_air!, prescribe_swc!, prescribe_t_leaf!, spac_beta_max, update_Cab!, update_LAI!, update_VJRWW!,
       update_par!, update_sif!, zenith_angle
-using Land.StomataModels: BetaGLinearPsoil, ESMMedlyn_hybrid, GswDrive, gas_exchange!, gsw_control!, prognostic_gsw!
+using Land.StomataModels: BetaGLinearPsoil, ESMMedlynHybrid, GswDrive, gas_exchange!, gsw_control!, prognostic_gsw!
 
 
 DF_VARIABLES  = ["F_H2O", "F_CO2", "F_GPP", "SIF683", "SIF740", "SIF757", "SIF771", "NDVI", "EVI", "NIRv"];
@@ -30,7 +30,7 @@ Prepare weather driver dataframe to feed CliMA Land, given
 - `wd_file` Weather driver file
 
 """
-function prepare_wd(dict::Dict, wd_file::String)
+function prepare_wd(dict::Dict, wd_file::String, DF_VARIABLES)
     _df_in = read_nc(wd_file);
 
     # compute T_MEAN based on the weather driver
@@ -101,7 +101,7 @@ function prepare_spac(dict::Dict; FT = Float64)
     # read general information from dict
     _lat = dict["latitude"];
     _lon = dict["longitude"]
-    _sm = ESMMedlyn_hybrid{FT}();
+    _sm = ESMMedlynHybrid{FT}();
 
     # use JULES soil depth 0.00 -- 0.10 -- 0.35 -- 1.00 -- 3.00 m, and assume 2 m deep root (z_root = -2) for all the sites
     _soil_bounds = FT[0, -0.1, -0.35, -1, -3];
@@ -136,7 +136,7 @@ function prepare_spac(dict::Dict; FT = Float64)
     end;
 
     # set up empirical model
-    if typeof(_sm) <: ESMMedlyn_hybrid
+    if typeof(_sm) <: ESMMedlynHybrid
         _node.photo_set = C3CLM(FT);
         _node.stomata_model.g1 = dict["g1_medlyn_c3"];
         _node.stomata_model.g0 = 1e-3;
@@ -265,7 +265,7 @@ Wrapper function to use prognostic_gsw!, given
 - `β` Tuning factor
 
 """
-function update_gsw!(spac::SPACMono{FT}, sm::ESMMedlyn_hybrid{FT}, ind::Int, δt::FT; β::FT = FT(1)) where {FT<:AbstractFloat}
+function update_gsw!(spac::SPACMono{FT}, sm::ESMMedlynHybrid{FT}, ind::Int, δt::FT; β::FT = FT(1)) where {FT<:AbstractFloat}
     prognostic_gsw!(spac.plant_ps[ind], spac.envirs[ind], sm, β, δt);
 
     return nothing
@@ -363,7 +363,52 @@ function run_model!(spac::SPACMono{FT}, df::DataFrame, nc_out::String) where {FT
 end
 
 
+relative_path = "./ClimaLand_examples/"
+
+include("../DataUtils/prep_data.jl")
+include("../DataUtils/data.jl")
+include("../HybridModels/model_64.jl")
+include("../DataUtils/losses.jl")
+
+
+using Flux, JLD2
+
+const predictors = [:T_AIR, :RAD, :SWC_1, :LAIx, :p_sat, :p_H2O, :p_atm, :LA]
+const x = [:LAIx, :p_sat, :p_H2O, :p_atm, :LA] # Assuming as independent variables
+const hybrid_model = LinearHybridModel(predictors, x, 1, 64)
+
+model_state_path = joinpath(@__DIR__, "hybrid_clima.jld2")
+model_state = JLD2.load(model_state_path, "model_state")
+
+Flux.loadmodel!(hybrid_model, model_state)
+
+import Land.StomataModels.stomatal_conductance
+using UnPack: @unpack
+using Land.StomataModels: CanopyLayer
+using Land.Photosynthesis: AirLayer
+
+function stomatal_conductance(model::ESMMedlynHybrid{FT}, canopyi::CanopyLayer{FT}, envir::AirLayer{FT}, β::FT, ind::Int) where {FT<:AbstractFloat}
+    @unpack g0, g1            = model;
+    @unpack An, p_sat, LA,LAIx  = canopyi;
+    @unpack p_a, p_atm, p_H₂O,t_air = envir;
+    vpd = max(FT(0.001), p_sat - p_H₂O);
+    println(p_sat)
+    d_vali2= [t_air, p_sat, p_sat, LAIx, p_sat, p_H₂O,p_atm,LA]
+    column_names = [:T_AIR, :RAD, :SWC_1, :LAIx, :p_sat, :p_H2O, :p_atm, :LA]
+
+    # Reshape the data into a 1xN matrix, where N is the number of columns
+    data_matrix = reshape(d_vali2, 1, :)
+    data_df = DataFrame(data_matrix, Symbol.(column_names))
+
+    α, ŷ = hybrid_model(data_df, Val(:infer))
+    α =α[1]
+
+    return α
+end
+
+
 @time dict = load(joinpath(@__DIR__, "debug.jld2"));
-@time wddf = prepare_wd(dict, joinpath(@__DIR__, "debug.nc"));
+@time wddf = prepare_wd(dict, joinpath(@__DIR__, "debug.nc"), DF_VARIABLES);
 @time spac = prepare_spac(dict);
+# the actual test !
 @time run_model!(spac, wddf, joinpath(@__DIR__, "debug.output3.nc"));

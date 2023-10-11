@@ -17,7 +17,7 @@ const model_state = JLD2.load(model_state_path, "model_state")
 Flux.loadmodel!(hybrid_model, model_state)
 
 
-function stomatal_conductance(model::ESMMedlyn_hybrid{FT}, canopyi::CanopyLayer{FT}, envir::AirLayer{FT}, β::FT, ind::Int) where {FT<:AbstractFloat}
+function stomatal_conductance(model::ESMMedlynHybrid{FT}, canopyi::CanopyLayer{FT}, envir::AirLayer{FT}, β::FT, ind::Int) where {FT<:AbstractFloat}
     @unpack g0, g1            = model;
     @unpack An, p_sat, LA,LAIx  = canopyi;
     @unpack p_a, p_atm, p_H₂O,t_air = envir;
