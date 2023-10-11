@@ -1,4 +1,4 @@
-relative_path = "./ClimaLand_examples/"
+relative_path = "../ClimaLand_examples/"
 
 include("../DataUtils/prep_data.jl")
 include("../DataUtils/data.jl")
@@ -32,7 +32,7 @@ for epoch in 1:2
 end
 
 model_state = Flux.state(model);
-jldsave(joinpath(@__DIR__,"hybrid_clima.jld2"); model_state)
+jldsave(joinpath(@__DIR__,relative_path,"hybrid_clima.jld2"); model_state)
 
 
 
@@ -46,5 +46,5 @@ data_matrix = reshape(d_vali2, 1, :)
 data_df = DataFrame(data_matrix, Symbol.(column_names))
 
 # Save predictions to an nc file
-α, ŷ = model(d_vali2, Val(:infer)) # bug?
+α, ŷ = model(data_df, Val(:infer)) # bug?
 save_predictions_to_nc(α, ŷ, joinpath(@__DIR__,"predictions2.nc"))

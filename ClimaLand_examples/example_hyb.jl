@@ -265,8 +265,8 @@ Wrapper function to use prognostic_gsw!, given
 - `β` Tuning factor
 
 """
-function update_gsw!(spac::SPACMono{FT}, sm::ESMMedlynHybrid{FT}, ind::Int, δt::FT; β::FT = FT(1)) where {FT<:AbstractFloat}
-    prognostic_gsw!(spac.plant_ps[ind], spac.envirs[ind], sm, β, δt);
+function update_gsw!(spac::SPACMono{FT}, sm::ESMMedlynHybrid{FT}, ind::Int, δt::FT; swc::FT,β::FT = FT(1)) where {FT<:AbstractFloat}
+    prognostic_gsw!(spac.plant_ps[ind], spac.envirs[ind], sm,swc, β, δt);
 
     return nothing
 end
@@ -288,7 +288,7 @@ function run_time_step!(spac::SPACMono{FT}, dfr::DataFrameRow, beta::BetaGLinear
     _df_dir::FT = dfr.RAD_DIR;
 
     # compute beta factor (based on Psoil, so canopy does not matter)
-    _βm = spac_beta_max(spac, beta);
+    _βm,swc_n = spac_beta_max(spac, beta);
 
     # calculate leaf level flux per canopy layer
     for _i_can in 1:spac.n_canopy
@@ -303,7 +303,7 @@ function run_time_step!(spac::SPACMono{FT}, dfr::DataFrameRow, beta::BetaGLinear
         else
             for _ in 1:30
                 gas_exchange!(spac.photo_set, _iPS, _iEN, GswDrive());
-                update_gsw!(spac, spac.stomata_model, _i_can, FT(120); β = _βm);
+                update_gsw!(spac, spac.stomata_model, _i_can,swc=swc_n,FT(120); β = _βm);
                 gsw_control!(spac.photo_set, _iPS, _iEN);
             end;
         end;
@@ -373,9 +373,9 @@ include("../DataUtils/losses.jl")
 
 using Flux, JLD2
 
-const predictors = [:T_AIR, :RAD, :SWC_1, :LAIx, :p_sat, :p_H2O, :p_atm, :LA]
-const x = [:LAIx, :p_sat, :p_H2O, :p_atm, :LA] # Assuming as independent variables
-const hybrid_model = LinearHybridModel(predictors, x, 1, 64)
+predictors = [:T_AIR, :RAD, :SWC_1, :LAIx, :p_sat, :p_H2O, :p_atm, :LA]
+x = [:LAIx, :p_sat, :p_H2O, :p_atm, :LA] # Assuming as independent variables
+hybrid_model = LinearHybridModel(predictors, x, 1, 64)
 
 model_state_path = joinpath(@__DIR__, "hybrid_clima.jld2")
 model_state = JLD2.load(model_state_path, "model_state")
@@ -387,13 +387,13 @@ using UnPack: @unpack
 using Land.StomataModels: CanopyLayer
 using Land.Photosynthesis: AirLayer
 
-function stomatal_conductance(model::ESMMedlynHybrid{FT}, canopyi::CanopyLayer{FT}, envir::AirLayer{FT}, β::FT, ind::Int) where {FT<:AbstractFloat}
+function stomatal_conductance(model::ESMMedlynHybrid{FT}, canopyi::CanopyLayer{FT}, envir::AirLayer{FT},swc::FT,β::FT, ind::Int) where {FT<:AbstractFloat}
     @unpack g0, g1            = model;
-    @unpack An, p_sat, LA,LAIx  = canopyi;
+    @unpack An, p_sat, LA,LAIx,Rn  = canopyi;
     @unpack p_a, p_atm, p_H₂O,t_air = envir;
     vpd = max(FT(0.001), p_sat - p_H₂O);
-    println(p_sat)
-    d_vali2= [t_air, p_sat, p_sat, LAIx, p_sat, p_H₂O,p_atm,LA]
+
+    d_vali2= [t_air, Rn[1], swc, LAIx[1], p_sat, p_H₂O,p_atm,LA]
     column_names = [:T_AIR, :RAD, :SWC_1, :LAIx, :p_sat, :p_H2O, :p_atm, :LA]
 
     # Reshape the data into a 1xN matrix, where N is the number of columns
