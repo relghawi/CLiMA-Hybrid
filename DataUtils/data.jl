@@ -16,7 +16,8 @@ function select_predictors(data, predictors)
         return select(df, predictors) |> Matrix |> transpose
     elseif isa(data, AbstractVector)
         # If data is an AbstractVector, assume it's an array of data
-        return data
+        indices = [findfirst(isequal(predictor), predictors) for predictor in predictors]
+        return data[indices]
     else
         throw(ArgumentError("Input data type not supported"))
     end

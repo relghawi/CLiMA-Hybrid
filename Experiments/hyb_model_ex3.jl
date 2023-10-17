@@ -1,4 +1,4 @@
-relative_path = "./ClimaLand_examples/"
+relative_path = "../ClimaLand_examples/"
 
 include("../DataUtils/prep_data.jl")
 include("../DataUtils/data.jl")
@@ -26,7 +26,7 @@ function validate(model, loader::Flux.Data.DataLoader)
 
     for data in loader
         df, y = data  # Extract df from the data tuple
-        α, ŷ = model(df, :infer)
+        α, ŷ = model(df)
         loss_y = Flux.mse(ŷ, y)
         loss += loss_y
     end
@@ -50,11 +50,11 @@ function train(model, trainloader::Flux.Data.DataLoader, valloader::Flux.Data.Da
         showspeed=true
     )
   
-    for epoch in 1:12
+    for epoch in 1:100
         for data in trainloader            
             grads = Flux.gradient(parameters) do
                 df, y = data
-                α, ŷ = model(df, :infer)
+                α, ŷ = model(df)
                 loss = Flux.mse(ŷ, y)
             end
         
