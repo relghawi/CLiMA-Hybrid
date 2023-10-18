@@ -13,12 +13,12 @@ using PkgUtility: month_days, nanmean
 using Land.CanopyLayers: EVI, FourBandsFittingHybrid, NDVI, NIRv, SIF_WL, SIF_740, fit_soil_mat!
 using Land.Photosynthesis: C3CLM, use_clm_td!
 using Land.PlantHydraulics: VanGenuchten, create_tree
-using Land.SoilPlantAirContinuum: CNPP, GPP, PPAR, SPACMono, T_VEG,Canopy_cond,An_out,LAIx_out,LA_out,p_sat_out,p_H₂O_out,p_atm_out, initialize_spac_canopy!, prescribe_air!, prescribe_swc!, prescribe_t_leaf!, spac_beta_max, update_Cab!, update_LAI!, update_VJRWW!,
-      update_par!, update_sif!, zenith_angle
+using Land.SoilPlantAirContinuum: CNPP, GPP, PPAR, SPACMono, T_VEG,Canopy_cond,An_out,LAIx_out,LA_out,p_sat_out,p_H₂O_out,p_atm_out,vpd_out,p_a_out,gamma_out,p_s_out,p_i_out, initialize_spac_canopy!, prescribe_air!, prescribe_swc!, prescribe_t_leaf!, spac_beta_max, update_Cab!, update_LAI!, update_VJRWW!,
+      update_par!, update_sif!, zenith_angle,gsw_ss_out,g_sw_out,g_bw_out,tao_esm_out,g_sw0_out
 using Land.StomataModels: BetaGLinearPsoil, ESMMedlyn, GswDrive, gas_exchange!, gsw_control!, prognostic_gsw!
 
 
-DF_VARIABLES  = ["F_H2O", "F_CO2", "F_GPP", "SIF683", "SIF740", "SIF757", "SIF771", "NDVI", "EVI", "NIRv","g_lw","An","LAIx","LA","p_sat","p_H2O","p_atm"];
+DF_VARIABLES  = ["F_H2O", "F_CO2", "F_GPP", "SIF683", "SIF740", "SIF757", "SIF771", "NDVI", "EVI", "NIRv","g_lw","An","LAIx","LA","p_sat","p_H2O","vpd","p_atm","gamma_out","p_s_out","p_i_out","beta_m","p_a","gsw_ss","g_sw","g_bw","tao_out","g_sw0"];
 
 
 """
@@ -138,7 +138,7 @@ function prepare_spac(dict::Dict; FT = Float64)
     # set up empirical model
     if typeof(_sm) <: ESMMedlyn
         _node.photo_set = C3CLM(FT);
-        _node.stomata_model.g1 = dict["g1_medlyn_c3"];
+        _node.stomata_model.g1 = 0.005;
         _node.stomata_model.g0 = 1e-3;
     else
         @warn "Stomatal model parameters are not initialized for $(typeof(_sm))";
@@ -322,6 +322,13 @@ function run_time_step!(spac::SPACMono{FT}, dfr::DataFrameRow, beta::BetaGLinear
     end;
 
     # save the total flux into the DataFrame
+    dfr.tao_out=tao_esm_out(spac);
+    dfr.gsw_ss=gsw_ss_out(spac);
+    dfr.g_sw=g_sw_out(spac)
+    dfr.g_sw0=g_sw0_out(spac)
+    dfr.g_bw=g_bw_out(spac)
+    dfr.beta_m=_βm
+    dfr.vpd=vpd_out(spac);
     dfr.g_lw = Canopy_cond(spac);
     dfr.An = An_out(spac);  
     dfr.LAIx= LAIx_out(spac);
@@ -329,7 +336,10 @@ function run_time_step!(spac::SPACMono{FT}, dfr::DataFrameRow, beta::BetaGLinear
     dfr.p_sat= p_sat_out(spac);
     dfr.p_H2O=p_H₂O_out(spac);
     dfr.p_atm=p_atm_out(spac);
-
+    dfr.p_a=p_a_out(spac);
+    dfr.gamma_out=gamma_out(spac);
+    dfr.p_i_out=p_i_out(spac);
+    dfr.p_s_out=p_s_out(spac);
     dfr.F_H2O = T_VEG(spac);
     dfr.F_CO2 = CNPP(spac);
     dfr.F_GPP = GPP(spac);
