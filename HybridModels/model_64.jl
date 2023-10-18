@@ -19,7 +19,7 @@ function DenseNN(in_dim, out_dim, neurons)
         Dense(in_dim => neurons, relu),
         Dense(neurons => neurons, relu),
         Dense(neurons => neurons, relu),
-        Dense(neurons => out_dim,tanh), vshape
+        Dense(neurons => out_dim, tanh), vshape
         )
 end
 
