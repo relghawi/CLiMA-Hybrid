@@ -20,7 +20,7 @@ trainloader, valloader, testloader, trainall, d_train, d_vali, d_test = split_da
 
 function validate(model, loader::Flux.Data.DataLoader)
     num_batches = length(loader)
-    loss::Float32 = 0.0
+    loss::Float32 = 0.0f0
 
     Flux.testmode!(model)
 
@@ -38,7 +38,8 @@ end
 function train(model, trainloader::Flux.Data.DataLoader, valloader::Flux.Data.DataLoader, optimizer, checkpoint_file::String)
 
     num_epochs_no_improvement = 0
-    best_loss = Inf
+    best_loss =  validate(model, valloader)
+
     Flux.trainmode!(model)
     parameters = Flux.params(model)
     

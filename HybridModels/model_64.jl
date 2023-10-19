@@ -15,9 +15,7 @@ vshape(x) = reshape(x, :)
 function DenseNN(in_dim, out_dim, neurons)
     Random.seed!(1234)
     return Flux.Chain(
-        BatchNorm(in_dim),
         Dense(in_dim => neurons, relu),
-        Dense(neurons => neurons, relu),
         Dense(neurons => neurons, relu),
         Dense(neurons => out_dim,tanh), vshape
         )
