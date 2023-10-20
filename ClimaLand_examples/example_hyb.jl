@@ -3,6 +3,8 @@
 # This file is meant for CliMA Land example
 #
 #
+include("hyb_stomatal.jl")
+
 using DataFrames: DataFrame, DataFrameRow
 using Dates: isleapyear
 using JLD2: load
@@ -15,7 +17,7 @@ using Land.Photosynthesis: C3CLM, use_clm_td!
 using Land.PlantHydraulics: VanGenuchten, create_tree
 using Land.SoilPlantAirContinuum: CNPP, GPP, PPAR, SPACMono, T_VEG, initialize_spac_canopy!, prescribe_air!, prescribe_swc!, prescribe_t_leaf!, spac_beta_max, update_Cab!, update_LAI!, update_VJRWW!,
       update_par!, update_sif!, zenith_angle
-using Land.StomataModels: BetaGLinearPsoil, ESMMedlyn_hybrid, GswDrive, gas_exchange!, gsw_control!, prognostic_gsw!
+using Land.StomataModels: BetaGLinearPsoil, ESMMedlynHybrid, GswDrive, gas_exchange!, gsw_control!, prognostic_gsw!
 
 
 DF_VARIABLES  = ["F_H2O", "F_CO2", "F_GPP", "SIF683", "SIF740", "SIF757", "SIF771", "NDVI", "EVI", "NIRv"];
@@ -30,7 +32,7 @@ Prepare weather driver dataframe to feed CliMA Land, given
 - `wd_file` Weather driver file
 
 """
-function prepare_wd(dict::Dict, wd_file::String)
+function prepare_wd(dict::Dict, wd_file::String, DF_VARIABLES)
     _df_in = read_nc(wd_file);
 
     # compute T_MEAN based on the weather driver
@@ -101,7 +103,7 @@ function prepare_spac(dict::Dict; FT = Float64)
     # read general information from dict
     _lat = dict["latitude"];
     _lon = dict["longitude"]
-    _sm = ESMMedlyn_hybrid{FT}();
+    _sm = ESMMedlynHybrid{FT}();
 
     # use JULES soil depth 0.00 -- 0.10 -- 0.35 -- 1.00 -- 3.00 m, and assume 2 m deep root (z_root = -2) for all the sites
     _soil_bounds = FT[0, -0.1, -0.35, -1, -3];
@@ -136,7 +138,7 @@ function prepare_spac(dict::Dict; FT = Float64)
     end;
 
     # set up empirical model
-    if typeof(_sm) <: ESMMedlyn_hybrid
+    if typeof(_sm) <: ESMMedlynHybrid
         _node.photo_set = C3CLM(FT);
         _node.stomata_model.g1 = dict["g1_medlyn_c3"];
         _node.stomata_model.g0 = 1e-3;
@@ -265,8 +267,8 @@ Wrapper function to use prognostic_gsw!, given
 - `β` Tuning factor
 
 """
-function update_gsw!(spac::SPACMono{FT}, sm::ESMMedlyn_hybrid{FT}, ind::Int, δt::FT; β::FT = FT(1)) where {FT<:AbstractFloat}
-    prognostic_gsw!(spac.plant_ps[ind], spac.envirs[ind], sm, β, δt);
+function update_gsw!(spac::SPACMono{FT}, sm::ESMMedlynHybrid{FT}, ind::Int, δt::FT; swc::FT,β::FT = FT(1)) where {FT<:AbstractFloat}
+    prognostic_gsw!(spac.plant_ps[ind], spac.envirs[ind], sm,swc, β, δt);
 
     return nothing
 end
@@ -288,7 +290,7 @@ function run_time_step!(spac::SPACMono{FT}, dfr::DataFrameRow, beta::BetaGLinear
     _df_dir::FT = dfr.RAD_DIR;
 
     # compute beta factor (based on Psoil, so canopy does not matter)
-    _βm = spac_beta_max(spac, beta);
+    _βm,swc_n = spac_beta_max(spac, beta,true);
 
     # calculate leaf level flux per canopy layer
     for _i_can in 1:spac.n_canopy
@@ -303,7 +305,7 @@ function run_time_step!(spac::SPACMono{FT}, dfr::DataFrameRow, beta::BetaGLinear
         else
             for _ in 1:30
                 gas_exchange!(spac.photo_set, _iPS, _iEN, GswDrive());
-                update_gsw!(spac, spac.stomata_model, _i_can, FT(120); β = _βm);
+                update_gsw!(spac, spac.stomata_model, _i_can,swc=swc_n,FT(120); β = _βm);
                 gsw_control!(spac.photo_set, _iPS, _iEN);
             end;
         end;
@@ -363,7 +365,9 @@ function run_model!(spac::SPACMono{FT}, df::DataFrame, nc_out::String) where {FT
 end
 
 
+
 @time dict = load(joinpath(@__DIR__, "debug.jld2"));
-@time wddf = prepare_wd(dict, joinpath(@__DIR__, "debug.nc"));
+@time wddf = prepare_wd(dict, joinpath(@__DIR__, "debug.nc"), DF_VARIABLES);
 @time spac = prepare_spac(dict);
+# the actual test !
 @time run_model!(spac, wddf, joinpath(@__DIR__, "debug.output3.nc"));

@@ -3,6 +3,8 @@
 # This file is meant for CliMA Land example
 #
 #
+include("hyb_stomatal.jl")
+
 using DataFrames: DataFrame, DataFrameRow
 using Dates: isleapyear
 using JLD2: load
@@ -13,12 +15,12 @@ using PkgUtility: month_days, nanmean
 using Land.CanopyLayers: EVI, FourBandsFittingHybrid, NDVI, NIRv, SIF_WL, SIF_740, fit_soil_mat!
 using Land.Photosynthesis: C3CLM, use_clm_td!
 using Land.PlantHydraulics: VanGenuchten, create_tree
-using Land.SoilPlantAirContinuum: CNPP, GPP, PPAR, SPACMono, T_VEG,Canopy_cond,An_out,LAIx_out,LA_out,p_sat_out,p_H₂O_out,p_atm_out,vpd_out,p_a_out,gamma_out,p_s_out,p_i_out, initialize_spac_canopy!, prescribe_air!, prescribe_swc!, prescribe_t_leaf!, spac_beta_max, update_Cab!, update_LAI!, update_VJRWW!,
-      update_par!, update_sif!, zenith_angle,gsw_ss_out,g_sw_out,g_bw_out,tao_esm_out,g_sw0_out,ga_spac,LAIx_out_un,Canopy_cond_un,T_VEG_un
+using Land.SoilPlantAirContinuum: CNPP, GPP, PPAR, SPACMono, T_VEG, initialize_spac_canopy!, prescribe_air!, prescribe_swc!, prescribe_t_leaf!, spac_beta_max, update_Cab!, update_LAI!, update_VJRWW!,
+      update_par!, update_sif!, zenith_angle,Canopy_cond_un
 using Land.StomataModels: BetaGLinearPsoil, ESMMedlyn, GswDrive, gas_exchange!, gsw_control!, prognostic_gsw!
 
 
-DF_VARIABLES  = ["F_H2O", "F_CO2", "F_GPP", "SIF683", "SIF740", "SIF757", "SIF771", "NDVI", "EVI", "NIRv","g_lw","An","LAIx","LA","p_sat","p_H2O","vpd","p_atm","gamma_out","p_s_out","p_i_out","beta_m","p_a","gsw_ss","g_sw","g_bw","tao_out","g_sw0","ga_spac","LAIx_out_un","g_lw_un","T_VEG_un"];
+DF_VARIABLES  = ["F_H2O", "F_CO2", "F_GPP", "SIF683", "SIF740", "SIF757", "SIF771", "NDVI", "EVI", "NIRv","g_lw_un"];
 
 
 """
@@ -30,7 +32,7 @@ Prepare weather driver dataframe to feed CliMA Land, given
 - `wd_file` Weather driver file
 
 """
-function prepare_wd(dict::Dict, wd_file::String)
+function prepare_wd(dict::Dict, wd_file::String, DF_VARIABLES)
     _df_in = read_nc(wd_file);
 
     # compute T_MEAN based on the weather driver
@@ -138,7 +140,7 @@ function prepare_spac(dict::Dict; FT = Float64)
     # set up empirical model
     if typeof(_sm) <: ESMMedlyn
         _node.photo_set = C3CLM(FT);
-        _node.stomata_model.g1 = 0.005;
+        _node.stomata_model.g1 = dict["g1_medlyn_c3"];
         _node.stomata_model.g0 = 1e-3;
     else
         @warn "Stomatal model parameters are not initialized for $(typeof(_sm))";
@@ -265,8 +267,8 @@ Wrapper function to use prognostic_gsw!, given
 - `β` Tuning factor
 
 """
-function update_gsw!(spac::SPACMono{FT}, sm::ESMMedlyn{FT}, ind::Int, δt::FT; β::FT = FT(1)) where {FT<:AbstractFloat}
-    prognostic_gsw!(spac.plant_ps[ind], spac.envirs[ind], sm, β, δt);
+function update_gsw!(spac::SPACMono{FT}, sm::ESMMedlyn{FT}, ind::Int, δt::FT; swc::FT,β::FT = FT(1)) where {FT<:AbstractFloat}
+    prognostic_gsw!(spac.plant_ps[ind], spac.envirs[ind], sm,swc, β, δt,true);
 
     return nothing
 end
@@ -288,7 +290,7 @@ function run_time_step!(spac::SPACMono{FT}, dfr::DataFrameRow, beta::BetaGLinear
     _df_dir::FT = dfr.RAD_DIR;
 
     # compute beta factor (based on Psoil, so canopy does not matter)
-    _βm = spac_beta_max(spac, beta);
+    _βm,swc_n = spac_beta_max(spac, beta,true);
 
     # calculate leaf level flux per canopy layer
     for _i_can in 1:spac.n_canopy
@@ -303,7 +305,7 @@ function run_time_step!(spac::SPACMono{FT}, dfr::DataFrameRow, beta::BetaGLinear
         else
             for _ in 1:30
                 gas_exchange!(spac.photo_set, _iPS, _iEN, GswDrive());
-                update_gsw!(spac, spac.stomata_model, _i_can, FT(120); β = _βm);
+                update_gsw!(spac, spac.stomata_model, _i_can,swc=swc_n,FT(120); β = _βm);
                 gsw_control!(spac.photo_set, _iPS, _iEN);
             end;
         end;
@@ -322,32 +324,11 @@ function run_time_step!(spac::SPACMono{FT}, dfr::DataFrameRow, beta::BetaGLinear
     end;
 
     # save the total flux into the DataFrame
-    dfr.T_VEG_un=T_VEG_un(spac)
-    dfr.LAIx_out_un=LAIx_out_un(spac)
-    dfr.ga_spac=ga_spac(spac)
-    dfr.tao_out=tao_esm_out(spac);
-    dfr.gsw_ss=gsw_ss_out(spac);
-    dfr.g_sw=g_sw_out(spac)
-    dfr.g_sw0=g_sw0_out(spac)
-    dfr.g_bw=g_bw_out(spac)
-    dfr.beta_m=_βm
-    dfr.vpd=vpd_out(spac);
-    dfr.g_lw = Canopy_cond(spac);
-    dfr.g_lw_un =Canopy_cond_un(spac);
-    dfr.An = An_out(spac);  
-    dfr.LAIx= LAIx_out(spac);
-    dfr.LA=LA_out(spac);
-    dfr.p_sat= p_sat_out(spac);
-    dfr.p_H2O=p_H₂O_out(spac);
-    dfr.p_atm=p_atm_out(spac);
-    dfr.p_a=p_a_out(spac);
-    dfr.gamma_out=gamma_out(spac);
-    dfr.p_i_out=p_i_out(spac);
-    dfr.p_s_out=p_s_out(spac);
     dfr.F_H2O = T_VEG(spac);
     dfr.F_CO2 = CNPP(spac);
     dfr.F_GPP = GPP(spac);
-
+    dfr.g_lw_un =Canopy_cond_un(spac);
+    #println(Canopy_cond_un(spac))
     return nothing
 end
 
@@ -385,7 +366,9 @@ function run_model!(spac::SPACMono{FT}, df::DataFrame, nc_out::String) where {FT
 end
 
 
-@time dict = load(joinpath(@__DIR__,"debug.jld2"));
-@time wddf = prepare_wd(dict, joinpath(@__DIR__, "debug.nc"));
+
+@time dict = load(joinpath(@__DIR__, "debug.jld2"));
+@time wddf = prepare_wd(dict, joinpath(@__DIR__, "debug.nc"), DF_VARIABLES);
 @time spac = prepare_spac(dict);
-@time run_model!(spac, wddf, joinpath(@__DIR__, "debug.output2.nc"));
+# the actual test !
+@time run_model!(spac, wddf, joinpath(@__DIR__, "debug.output3.nc"));
