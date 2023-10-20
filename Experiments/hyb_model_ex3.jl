@@ -43,7 +43,7 @@ function train(model, trainloader::Flux.Data.DataLoader, valloader::Flux.Data.Da
     optim = Flux.setup(optimizer, model)
 
     bar = Progress(
-        length(trainloader),
+        n_epochs,
         dt=1.0;
         barglyphs=BarGlyphs('|','█', ['▁' ,'▂' ,'▃' ,'▄' ,'▅' ,'▆', '▇'],' ','|',),
         barlen=20,
@@ -78,7 +78,7 @@ function train(model, trainloader::Flux.Data.DataLoader, valloader::Flux.Data.Da
         else
             num_epochs_no_improvement += 1
             if num_epochs_no_improvement >= patience
-                println("Early stopping! No improvement for 10 epochs.")
+                println("Early stopping! No improvement for $(patience) epochs.")
                 break
             end
         end
