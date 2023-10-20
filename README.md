@@ -8,7 +8,23 @@ Just activate the environment in the root folder [CLiMA-Hybrid] and do:
 ] add https://github.com/lazarusA/Land.git#single_site
 ```
 
-Download these files
+or, if you want to do further changes to `Land` locally then do 
+
+```julia
+] dev --local https://github.com/lazarusA/Land.git
+```
+
+`cd` to `Land` and checkout the branch `single_site`, i.e.
+
+```shell
+> cd Land
+Land> git checkout single_site
+Land> git pull # get the latest changes if any 
+```
+start working with your scripts by running them or adding more packages to your env `CLiMA-Hybrid`.
+
+# Download files
+The examples here need the following files:
 
 ```
 $ wget https://github.com/CliMA/Land/raw/v0.1/examples/debug.jld2
