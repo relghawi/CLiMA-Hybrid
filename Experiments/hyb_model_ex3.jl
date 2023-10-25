@@ -12,11 +12,11 @@ wd_file =joinpath(relative_path, "clima_ds_full.nc")
 df = prepare_wd(dict, wd_file)
 
 # Specify predictors and target based on DataFrame columns
-predictors = [:F_H2O]
-target = :F_H2O
+predictors = [:T_AIR, :RAD, :SWC_1,:LAIx, :p_sat,:p_H2O,:p_atm,:LA,:T_VEG_un]
+target = :T_VEG_un
 x = [:LAIx, :p_sat,:p_H2O,:p_atm,:LA] # Assuming as independent variables
 
-trainloader, valloader, testloader, trainall, d_train, d_vali, d_test = split_data(df, target, predictors, x, batchsize=100, f=0.8, v=0.1, shuffle=true, partial=true)
+trainloader, valloader, testloader, trainall, d_train, d_vali, d_test = split_data(df, target, predictors, x, batchsize=1000, f=0.8, v=0.1, shuffle=true, partial=true)
 
 function getLoss(model, loader::Flux.Data.DataLoader)
     num_batches = length(loader)
@@ -34,7 +34,7 @@ end
 
 
 function train(model, trainloader::Flux.Data.DataLoader, valloader::Flux.Data.DataLoader,
-        checkpoint_file::String; optimizer=Flux.ADAM(), n_epochs= 500, patience=100)
+        checkpoint_file::String; optimizer=Flux.ADAM(0.005), n_epochs=5000, patience=50)
 
     num_epochs_no_improvement = 0
     best_epoch = 0
@@ -52,6 +52,7 @@ function train(model, trainloader::Flux.Data.DataLoader, valloader::Flux.Data.Da
     train_losses = Float32[]
     val_losses = Float32[]
 
+
     for epoch in 1:n_epochs
         for data in trainloader            
             loss, grads = Flux.withgradient(model) do m
@@ -64,8 +65,16 @@ function train(model, trainloader::Flux.Data.DataLoader, valloader::Flux.Data.Da
         train_loss = getLoss(model, trainloader)
         push!(train_losses, train_loss)
         
+        for data in valloader
+            loss, grads = Flux.withgradient(model) do m
+                df, y = data       
+                α, ŷ = m(df)
+                loss = Flux.mse(ŷ, y)
+            end
+        end
         val_loss = getLoss(model, valloader)
         push!(val_losses, val_loss)
+ 
 
         if val_loss < best_loss
             best_loss = val_loss
@@ -73,7 +82,7 @@ function train(model, trainloader::Flux.Data.DataLoader, valloader::Flux.Data.Da
             best_epoch = epoch
             # Flux.state(model) |> BSON.@save checkpoint_file 
             model_state = Flux.state(model)
-            jldsave(joinpath(@__DIR__,"hybrid_clima.jld2"); model_state)
+            jldsave(joinpath(@__DIR__,checkpoint_file); model_state)
             #println("Best Model Saved")
         else
             num_epochs_no_improvement += 1
@@ -85,6 +94,7 @@ function train(model, trainloader::Flux.Data.DataLoader, valloader::Flux.Data.Da
         next!(bar; showvalues = [(:epoch, epoch), (:val_loss, val_loss), (:best_epoch, best_epoch)])
     end
     
+
     println("Training completed!")
     return train_losses, val_losses
 end
@@ -98,13 +108,13 @@ end
 
 # Function to test or make predictions using the loaded model
 function test_model(model, testloader::Flux.Data.DataLoader)
-    Flux.testmode!(model)
+    # Flux.testmode!(model)
     all_predictions = []
     
     for data in testloader
-        df, _ = data  # Assuming you don't have labels in the test data
+        df, y = data  # Assuming you don't have labels in the test data
         α, ŷ = model(df, :infer)
-        save_predictions_to_nc(α, ŷ, joinpath(@__DIR__,"predictions3.nc"))
+        save_predictions_to_nc(α, ŷ,y, joinpath(@__DIR__,"predictions3.nc"))
         push!(all_predictions, ŷ)
     end
     
@@ -112,7 +122,7 @@ function test_model(model, testloader::Flux.Data.DataLoader)
 end
 
 # Create an instance of the LinearHybridModel
-model = LinearHybridModel(predictors, x, 1, 256)
+model = LinearHybridModel(predictors, x, 1, 128)
 
 # Train the model
 checkpoint_file = "hybrid_clima.jld2"  # Specify the checkpoint file path here

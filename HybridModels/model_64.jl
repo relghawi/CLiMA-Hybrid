@@ -15,10 +15,11 @@ vshape(x) = reshape(x, :)
 function DenseNN(in_dim, out_dim, neurons)
     Random.seed!(1234)
     return Flux.Chain(
+        BatchNorm(in_dim),
         Dense(in_dim => neurons, relu),
         Dense(neurons => neurons, relu),
         Dense(neurons => neurons, relu),
-        Dense(neurons => out_dim, tanh), vshape
+        Dense(neurons => out_dim,hardtanh), vshape
         )
 end
 
@@ -50,14 +51,15 @@ function (lhm::LinearHybridModel)(df, infer::Symbol)
 end
 
 
-function save_predictions_to_nc(α_list, ŷ_list, filepath::String)
+function save_predictions_to_nc(α_list, ŷ_list,y_list, filepath::String)
     num_samples = length(α_list)
     
     # Create a DataFrame with accumulated α and ŷ values
-    df = DataFrame(α=zeros(num_samples), ŷ=zeros(num_samples))
+    df = DataFrame(α=zeros(num_samples), ŷ=zeros(num_samples),y=zeros(num_samples))
     for i in 1:num_samples
         df.α[i] = α_list[i]
         df.ŷ[i] = ŷ_list[i]
+        df.y[i] = y_list[i]
     end
     
     save_nc!(filepath, df)
