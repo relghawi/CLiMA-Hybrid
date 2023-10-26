@@ -12,7 +12,7 @@ wd_file =joinpath(relative_path, "clima_ds_full.nc")
 df = prepare_wd(dict, wd_file)
 
 # Specify predictors and target based on DataFrame columns
-predictors = [:T_AIR, :RAD, :SWC_1,:LAIx, :p_sat,:p_H2O,:p_atm,:LA,:T_VEG_un]
+predictors = [:T_AIR, :RAD, :SWC_1,:LAIx, :p_sat,:p_H2O,:p_atm,:LA]
 target = :T_VEG_un
 x = [:LAIx, :p_sat,:p_H2O,:p_atm,:LA] # Assuming as independent variables
 
@@ -82,7 +82,7 @@ function train(model, trainloader::Flux.Data.DataLoader, valloader::Flux.Data.Da
             best_epoch = epoch
             # Flux.state(model) |> BSON.@save checkpoint_file 
             model_state = Flux.state(model)
-            jldsave(joinpath(@__DIR__,checkpoint_file); model_state)
+            jldsave(joinpath(@__DIR__,relative_path,checkpoint_file); model_state)
             #println("Best Model Saved")
         else
             num_epochs_no_improvement += 1
@@ -101,7 +101,7 @@ end
 
 # Function to load the trained model from a checkpoint file
 function load_model(model, checkpoint_file::String)
-    model_state_path = joinpath(@__DIR__, checkpoint_file)
+    model_state_path = joinpath(@__DIR__,relative_path, checkpoint_file)
     model_state = JLD2.load(model_state_path, "model_state")
     Flux.loadmodel!(model, model_state)
 end

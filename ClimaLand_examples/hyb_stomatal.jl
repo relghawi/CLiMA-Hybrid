@@ -7,9 +7,9 @@ include("../DataUtils/losses.jl")
 
 using Flux, JLD2
 
-predictors = [:T_AIR, :RAD, :SWC_1, :LAIx, :p_sat, :p_H2O, :p_atm, :LA]
-x = [:LAIx, :p_sat, :p_H2O, :p_atm, :LA] # Assuming as independent variables
-hybrid_model = LinearHybridModel(predictors, x, 1, 64)
+predictors = [:T_AIR, :RAD, :SWC_1,:LAIx, :p_sat,:p_H2O,:p_atm,:LA]
+x = [:LAIx, :p_sat,:p_H2O,:p_atm,:LA] # Assuming as independent variables
+hybrid_model = LinearHybridModel(predictors, x, 1, 128)
 
 model_state_path = joinpath(@__DIR__, "hybrid_clima.jld2")
 model_state = JLD2.load(model_state_path, "model_state")
@@ -66,7 +66,7 @@ function prognostic_gsw!(clayer::CanopyLayer{FT}, envir::AirLayer{FT}, sm::Empir
 
     if Hyb
         d_vali2 = [t_air, Rn[1], swc, LAIx[1], p_sat, p_H₂O, p_atm, LA]
-        column_names = [:T_AIR, :RAD, :SWC_1, :LAIx, :p_sat, :p_H2O, :p_atm, :LA]
+        column_names = [:T_AIR, :RAD, :SWC_1,:LAIx, :p_sat,:p_H2O,:p_atm,:LA]
         data_matrix = reshape(d_vali2, 1, :)
 
         data_df = DataFrame(data_matrix, Symbol.(column_names))
