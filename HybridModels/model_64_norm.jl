@@ -1,21 +1,26 @@
 using Flux
 using NetcdfIO: read_nc, save_nc!
+
+include("../DataUtils/NormalizationModule.jl")
+norm= NormalizationModule.MatrixNormalizationModule
 ########################################
 # Model definition y = ax + b, where 
 ########################################
 struct LinearHybridModel # lhm
     DenseLayers::Flux.Chain
     predictors::AbstractArray{Symbol}
+    latents::AbstractArray{Symbol}
     x
     b
 end
+# Define the NormalizationModule
+
 
 vshape(x) = reshape(x, :)
 
 function DenseNN(in_dim, out_dim, neurons)
     Random.seed!(1234)
     return Flux.Chain(
-        BatchNorm(in_dim),
         Dense(in_dim => neurons, relu),
         Dense(neurons => neurons, relu),
         Dense(neurons => neurons, relu),
@@ -23,21 +28,23 @@ function DenseNN(in_dim, out_dim, neurons)
         )
 end
 
-function LinearHybridModel(predictors, x, out_dim, neurons, b=[1.5])
+function LinearHybridModel(predictors,latents, x, out_dim, neurons, b=[1.5])
     in_dim = length(predictors)
     ch = DenseNN(in_dim, out_dim, neurons)
-    LinearHybridModel(ch, predictors, x, b)
+    LinearHybridModel(ch, predictors,latents, x, b)
 end
 
 # let's multi dispatch
 
 function (lhm::LinearHybridModel)(df)
     x_matrix = select_predictors(df, lhm.predictors)
-    α = lhm.DenseLayers(x_matrix)
-    println(α)
+    x_latents=select_predictors(df, lhm.latents)
+    stats, normalized_df = norm.fit_and_normalize(x_matrix)
+    stats_latents, _ = norm.fit_and_normalize(x_latents)
+    α = lhm.DenseLayers(normalized_df)
     (LAIx, p_sat, p_H2O, p_atm, LA) = select_variable(df, lhm.x)
-    ŷ = α #.* (p_sat - p_H2O) ./ p_atm .* LA ### F_H2O = g_lw * (p_sat-p_H2O)/p_atm * LA ## Medlyns model
-    #ŷ = α
+    denormalized_α = norm.denormalize(stats_latents, α)
+    ŷ =  denormalized_α .* (p_sat - p_H2O) ./ p_atm .* LA ### F_H2O = g_lw * (p_sat-p_H2O)/p_atm * LA ## Medlyns model
     return (; α, ŷ)
 end
 
