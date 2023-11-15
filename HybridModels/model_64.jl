@@ -16,9 +16,9 @@ function DenseNN(in_dim, out_dim, neurons)
     Random.seed!(1234)
     return Flux.Chain(
         BatchNorm(in_dim),
-        Dense(in_dim => neurons, relu),
-        Dense(neurons => neurons, relu),
-        Dense(neurons => neurons, relu),
+        Dense(in_dim => neurons, leakyrelu),
+        Dense(neurons => neurons, leakyrelu),
+        Dense(neurons => neurons, leakyrelu),
         Dense(neurons => out_dim,hardtanh), vshape
         )
 end
@@ -33,10 +33,12 @@ end
 
 function (lhm::LinearHybridModel)(df)
     x_matrix = select_predictors(df, lhm.predictors)
+
     α = lhm.DenseLayers(x_matrix)
-    println(α)
+    #α = relu(hardtanh(α))
+    #println(α)
     (LAIx, p_sat, p_H2O, p_atm, LA) = select_variable(df, lhm.x)
-    ŷ = α #.* (p_sat - p_H2O) ./ p_atm .* LA ### F_H2O = g_lw * (p_sat-p_H2O)/p_atm * LA ## Medlyns model
+    ŷ = α .* (p_sat - p_H2O) ./ p_atm .* LA ### F_H2O = g_lw * (p_sat-p_H2O)/p_atm * LA ## Medlyns model
     #ŷ = α
     return (; α, ŷ)
 end
@@ -65,6 +67,23 @@ function save_predictions_to_nc(α_list, ŷ_list,y_list, filepath::String)
     
     save_nc!(filepath, df)
 end
+
+
+function save_predictions_to_nc(gs_list,α_list, ŷ_list,y_list, filepath::String)
+    num_samples = length(α_list)
+    
+    # Create a DataFrame with accumulated α and ŷ values
+    df = DataFrame(gs=zeros(num_samples),α=zeros(num_samples), ŷ=zeros(num_samples),y=zeros(num_samples))
+    for i in 1:num_samples
+        df.gs[i] = gs_list[i]
+        df.α[i] = α_list[i]
+        df.ŷ[i] = ŷ_list[i]
+        df.y[i] = y_list[i]
+    end
+    
+    save_nc!(filepath, df)
+end
+
 
 # Call @functor to allow for training the custom model
 Flux.@functor LinearHybridModel

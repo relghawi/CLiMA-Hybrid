@@ -36,19 +36,12 @@ end
 
 # let's multi dispatch
 
-function (lhm::LinearHybridModel)(df)
-    x_matrix = select_predictors(df, lhm.predictors)
-    println("x_matrix 1")
-    println(x_matrix)
-    x_latents=select_predictors(df, lhm.latents)
-    stats, normalized_data= norm.fit_and_normalize(x_matrix)
+function (lhm::LinearHybridModel)(df,norm_vars,stats_latents)
     println("normalized_data")
-    println(normalized_data)
-    # println(stats)
-    stats_latents, _ = norm.fit_and_normalize(x_latents)
-    α = lhm.DenseLayers(normalized_data)
+    println(norm_vars)
+    α = lhm.DenseLayers(norm_vars)
     (LAIx, p_sat, p_H2O, p_atm, LA) = select_variable(df, lhm.x)
-    #α_denorm = norm.denormalize(stats_latents, copy(α))
+    α = norm.denormalize(stats_latents, α)
     # println("denormalized_α")
     # println(α)
     ŷ =  α .* (p_sat - p_H2O) ./ p_atm .* LA ### F_H2O = g_lw * (p_sat-p_H2O)/p_atm * LA ## Medlyns model

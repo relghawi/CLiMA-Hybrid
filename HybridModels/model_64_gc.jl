@@ -1,57 +1,45 @@
 using Flux
 using NetcdfIO: read_nc, save_nc!
-
-include("../DataUtils/NormalizationModule.jl")
-norm= NormalizationModule.MatrixNormalizationModule
 ########################################
 # Model definition y = ax + b, where 
 ########################################
 struct LinearHybridModel # lhm
     DenseLayers::Flux.Chain
     predictors::AbstractArray{Symbol}
-    latents::AbstractArray{Symbol}
     x
     b
 end
-# Define the NormalizationModule
-
 
 vshape(x) = reshape(x, :)
 
 function DenseNN(in_dim, out_dim, neurons)
     Random.seed!(1234)
     return Flux.Chain(
-        Dense(in_dim => neurons, relu),
-        Dense(neurons => neurons, relu),
-        Dense(neurons => neurons, relu),
+        BatchNorm(in_dim),
+        Dense(in_dim => neurons, leakyrelu),
+        Dense(neurons => neurons, leakyrelu),
+        Dense(neurons => neurons, leakyrelu),
         Dense(neurons => out_dim,hardtanh), vshape
         )
 end
 
-function LinearHybridModel(predictors,latents, x, out_dim, neurons, b=[1.5])
+function LinearHybridModel(predictors, x, out_dim, neurons, b=[1.5])
     in_dim = length(predictors)
     ch = DenseNN(in_dim, out_dim, neurons)
-    LinearHybridModel(ch, predictors,latents, x, b)
+    LinearHybridModel(ch, predictors, x, b)
 end
 
 # let's multi dispatch
 
 function (lhm::LinearHybridModel)(df)
     x_matrix = select_predictors(df, lhm.predictors)
-    println("x_matrix 1")
-    println(x_matrix)
-    x_latents=select_predictors(df, lhm.latents)
-    stats, normalized_data= norm.fit_and_normalize(x_matrix)
-    println("normalized_data")
-    println(normalized_data)
-    # println(stats)
-    stats_latents, _ = norm.fit_and_normalize(x_latents)
-    α = lhm.DenseLayers(normalized_data)
-    (LAIx, p_sat, p_H2O, p_atm, LA) = select_variable(df, lhm.x)
-    #α_denorm = norm.denormalize(stats_latents, copy(α))
-    # println("denormalized_α")
-    # println(α)
-    ŷ =  α .* (p_sat - p_H2O) ./ p_atm .* LA ### F_H2O = g_lw * (p_sat-p_H2O)/p_atm * LA ## Medlyns model
+
+    α = lhm.DenseLayers(x_matrix)
+    #α = relu(hardtanh(α))
+    #println(α)
+    (LAIx, p_sat, p_H2O, p_atm, LA,ga_spac) = select_variable(df, lhm.x)
+    ŷ = (α .* (p_sat - p_H2O) ./ p_atm .* LA ) ./ga_spac### F_H2O = g_lw * (p_sat-p_H2O)/p_atm * LA ## Medlyns model
+    #ŷ = α
     return (; α, ŷ)
 end
 
@@ -79,6 +67,23 @@ function save_predictions_to_nc(α_list, ŷ_list,y_list, filepath::String)
     
     save_nc!(filepath, df)
 end
+
+
+function save_predictions_to_nc(gs_list,α_list, ŷ_list,y_list, filepath::String)
+    num_samples = length(α_list)
+    
+    # Create a DataFrame with accumulated α and ŷ values
+    df = DataFrame(gs=zeros(num_samples),α=zeros(num_samples), ŷ=zeros(num_samples),y=zeros(num_samples))
+    for i in 1:num_samples
+        df.gs[i] = gs_list[i]
+        df.α[i] = α_list[i]
+        df.ŷ[i] = ŷ_list[i]
+        df.y[i] = y_list[i]
+    end
+    
+    save_nc!(filepath, df)
+end
+
 
 # Call @functor to allow for training the custom model
 Flux.@functor LinearHybridModel

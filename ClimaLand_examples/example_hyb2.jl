@@ -16,11 +16,11 @@ using Land.CanopyLayers: EVI, FourBandsFittingHybrid, NDVI, NIRv, SIF_WL, SIF_74
 using Land.Photosynthesis: C3CLM, use_clm_td!
 using Land.PlantHydraulics: VanGenuchten, create_tree
 using Land.SoilPlantAirContinuum: CNPP, GPP, PPAR, SPACMono, T_VEG, initialize_spac_canopy!, prescribe_air!, prescribe_swc!, prescribe_t_leaf!, spac_beta_max, update_Cab!, update_LAI!, update_VJRWW!,
-      update_par!, update_sif!, zenith_angle,Canopy_cond_un
+      update_par!, update_sif!, zenith_angle,Canopy_cond_un,T_VEG_un
 using Land.StomataModels: BetaGLinearPsoil, ESMMedlyn, GswDrive, gas_exchange!, gsw_control!, prognostic_gsw!
 
 
-DF_VARIABLES  = ["F_H2O", "F_CO2", "F_GPP", "SIF683", "SIF740", "SIF757", "SIF771", "NDVI", "EVI", "NIRv","g_lw_un"];
+DF_VARIABLES  = ["F_H2O", "F_CO2", "F_GPP", "SIF683", "SIF740", "SIF757", "SIF771", "NDVI", "EVI", "NIRv","g_lw_un","T_VEG_un"];
 
 
 """
@@ -268,7 +268,7 @@ Wrapper function to use prognostic_gsw!, given
 
 """
 function update_gsw!(spac::SPACMono{FT}, sm::ESMMedlyn{FT}, ind::Int, δt::FT; swc::FT,β::FT = FT(1)) where {FT<:AbstractFloat}
-    prognostic_gsw!(spac.plant_ps[ind], spac.envirs[ind], sm,swc, β, δt,true);
+    prognostic_gsw!(spac.plant_ps[ind], spac.envirs[ind], sm,swc, β, δt); #,true
 
     return nothing
 end
@@ -327,7 +327,9 @@ function run_time_step!(spac::SPACMono{FT}, dfr::DataFrameRow, beta::BetaGLinear
     dfr.F_H2O = T_VEG(spac);
     dfr.F_CO2 = CNPP(spac);
     dfr.F_GPP = GPP(spac);
-    dfr.g_lw_un =Canopy_cond_un(spac);
+    g_lw_pred, t_veg_pred = Canopy_cond_un(spac,true)
+    dfr.g_lw_un =g_lw_pred
+    dfr.T_VEG_un=t_veg_pred
     #println(Canopy_cond_un(spac))
     return nothing
 end
@@ -371,4 +373,4 @@ end
 @time wddf = prepare_wd(dict, joinpath(@__DIR__, "debug.nc"), DF_VARIABLES);
 @time spac = prepare_spac(dict);
 # the actual test !
-@time run_model!(spac, wddf, joinpath(@__DIR__, "debug.output3.nc"));
+@time run_model!(spac, wddf, joinpath(@__DIR__, "debug.outputgsleaf.nc"));

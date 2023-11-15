@@ -1,3 +1,4 @@
+
 module NormalizationModule
     export DataFrameNormalization, MatrixNormalization
 
@@ -94,7 +95,7 @@ module NormalizationModule
     
             return normalized_data
         end
-    
+
         function denormalize(stats::MatrixNormalizationStats,  data::Vector{Float32})
             num_cols = length(data)
             denormalized_data = similar(data)

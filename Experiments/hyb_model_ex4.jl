@@ -2,7 +2,7 @@ relative_path = "../ClimaLand_examples/"
 
 include("../DataUtils/prep_data.jl")
 include("../DataUtils/data.jl")
-include("../HybridModels/model_64_norm.jl")
+include("../HybridModels/model_64.jl")
 
 using JLD2
 import ProgressMeter: BarGlyphs, next!, Progress
@@ -13,11 +13,10 @@ df = prepare_wd(dict, wd_file)
 
 # Specify predictors and target based on DataFrame columns
 predictors = [:T_AIR, :RAD, :SWC_1,:LAIx, :p_sat,:p_H2O,:p_atm,:LA]
-latents = [:g_lw_un]
 target = :T_VEG_un
 x = [:LAIx, :p_sat,:p_H2O,:p_atm,:LA] # Assuming as independent variables
 
-trainloader, valloader, testloader, trainall, d_train, d_vali, d_test = split_data(df, target, predictors, latents,x, batchsize=5, f=0.8, v=0.1, shuffle=true, partial=true)
+trainloader, valloader, testloader, trainall, d_train, d_vali, d_test = split_data(df, target, predictors, x, batchsize=5, f=0.8, v=0.1, shuffle=true, partial=true)
 
 function getLoss(model, loader::Flux.Data.DataLoader)
     num_batches = length(loader)
@@ -59,8 +58,6 @@ function train(model, trainloader::Flux.Data.DataLoader, valloader::Flux.Data.Da
             loss, grads = Flux.withgradient(model) do m
                 df, y = data
                 α, ŷ = m(df)
-                # println("α from exp")
-                # println(α)
                 loss = Flux.mse(ŷ, y)
             end
             Flux.update!(optim, model, grads[1])
@@ -94,7 +91,7 @@ function train(model, trainloader::Flux.Data.DataLoader, valloader::Flux.Data.Da
                 break
             end
         end
-        next!(bar; showvalues = [(:epoch, epoch), (:val_loss, val_loss), (:best_epoch, best_epoch)])
+        next!(bar; showvalues = [(:epoch, epoch), (:train_loss, train_loss),(:val_loss, val_loss), (:best_epoch, best_epoch)])
     end
     
 
@@ -125,7 +122,7 @@ function test_model(model, testloader::Flux.Data.DataLoader)
 end
 
 # Create an instance of the LinearHybridModel
-model = LinearHybridModel(predictors,latents, x, 1, 128)
+model = LinearHybridModel(predictors, x, 1, 128)
 
 # Train the model
 checkpoint_file = "hybrid_clima.jld2"  # Specify the checkpoint file path here
