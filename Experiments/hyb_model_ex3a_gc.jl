@@ -114,7 +114,7 @@ function test_model(model, testloader::Flux.Data.DataLoader)
 end
 
 # Create an instance of the LinearHybridModel
-model = LinearHybridModel(predictors, x, 1, 128)
+model = LinearHybridModel_canopy(predictors, x, 1, 128)
 
 # Train the model
 checkpoint_file = "hybrid_clima_gc.jld2"  # Specify the checkpoint file path here

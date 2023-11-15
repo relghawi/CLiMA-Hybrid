@@ -3,6 +3,8 @@
 # This file is meant for CliMA Land example
 #
 #
+include("hyb_stomatal.jl")
+
 using DataFrames: DataFrame, DataFrameRow
 using Dates: isleapyear
 using JLD2: load
@@ -13,12 +15,12 @@ using PkgUtility: month_days, nanmean
 using Land.CanopyLayers: EVI, FourBandsFittingHybrid, NDVI, NIRv, SIF_WL, SIF_740, fit_soil_mat!
 using Land.Photosynthesis: C3CLM, use_clm_td!
 using Land.PlantHydraulics: VanGenuchten, create_tree
-using Land.SoilPlantAirContinuum: CNPP, GPP, PPAR, SPACMono, T_VEG,Canopy_cond,An_out,LAIx_out,LA_out,p_sat_out,p_H₂O_out,p_atm_out,vpd_out,p_a_out,gamma_out,p_s_out,p_i_out, initialize_spac_canopy!, prescribe_air!, prescribe_swc!, prescribe_t_leaf!, spac_beta_max, update_Cab!, update_LAI!, update_VJRWW!,
-      update_par!, update_sif!, zenith_angle,gsw_ss_out,g_sw_out,g_bw_out,tao_esm_out,g_sw0_out,ga_spac,LAIx_out_un,Canopy_cond_un,T_VEG_un #,Rad_out,Rad_out_un
+using Land.SoilPlantAirContinuum: CNPP, GPP, PPAR, SPACMono, T_VEG,An_out,LAIx_out,LA_out,p_sat_out,p_H₂O_out,p_atm_out,vpd_out,p_a_out,gamma_out,p_s_out,p_i_out, initialize_spac_canopy!, prescribe_air!, prescribe_swc!, prescribe_t_leaf!, spac_beta_max, update_Cab!, update_LAI!, update_VJRWW!,
+      update_par!, update_sif!, zenith_angle,gsw_ss_out,g_sw_out,g_bw_out,tao_esm_out,g_sw0_out,ga_spac,LAIx_out_un #,Rad_out,Rad_out_un
 using Land.StomataModels: BetaGLinearPsoil, ESMMedlyn, GswDrive, gas_exchange!, gsw_control!, prognostic_gsw!
 
 
-DF_VARIABLES  = ["F_H2O", "F_CO2", "F_GPP", "SIF683", "SIF740", "SIF757", "SIF771", "NDVI", "EVI", "NIRv","g_lw","An","LAIx","LA","p_sat","p_H2O","vpd","p_atm","gamma_out","p_s_out","p_i_out","beta_m","p_a","gsw_ss","g_sw","g_bw","tao_out","g_sw0","ga_spac","LAIx_out_un","g_lw_un","T_VEG_un"];
+DF_VARIABLES  = ["F_H2O", "F_CO2", "F_GPP", "SIF683", "SIF740", "SIF757", "SIF771", "NDVI", "EVI", "NIRv","g_lw","T_VEG","An","LAIx","LA","p_sat","p_H2O","vpd","p_atm","gamma_out","p_s_out","p_i_out","beta_m","p_a","gsw_ss","g_sw","g_bw","tao_out","g_sw0","ga_spac","LAIx_out_un","g_lw_un","T_VEG_un"];
 
 
 """
@@ -322,7 +324,7 @@ function run_time_step!(spac::SPACMono{FT}, dfr::DataFrameRow, beta::BetaGLinear
     end;
 
     # save the total flux into the DataFrame
-    dfr.T_VEG_un=T_VEG_un(spac)
+
     dfr.LAIx_out_un=LAIx_out_un(spac)
     dfr.ga_spac=ga_spac(spac)
     dfr.tao_out=tao_esm_out(spac);
@@ -334,8 +336,12 @@ function run_time_step!(spac::SPACMono{FT}, dfr::DataFrameRow, beta::BetaGLinear
     dfr.vpd=vpd_out(spac);
     # dfr.Rad_out=Rad_out(spac)
     # dfr.Rad_out_un=Rad_out_un(spac)
-    dfr.g_lw = Canopy_cond(spac);
-    dfr.g_lw_un =Canopy_cond_un(spac);
+    g_lw, t_veg = Canopy_cond(spac,false)
+    dfr.T_VEG = t_veg
+    dfr.g_lw = g_lw
+    g_lw_un, t_veg_un  =Canopy_cond_un(spac,false);
+    dfr.g_lw_un =  g_lw_un
+    dfr.T_VEG_un=t_veg_un
     dfr.An = An_out(spac);  
     dfr.LAIx= LAIx_out(spac);
     dfr.LA=LA_out(spac);

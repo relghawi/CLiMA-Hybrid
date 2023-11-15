@@ -3,7 +3,7 @@ using NetcdfIO: read_nc, save_nc!
 ########################################
 # Model definition y = ax + b, where 
 ########################################
-struct LinearHybridModel # lhm
+struct LinearHybridModel_canopy # lhm
     DenseLayers::Flux.Chain
     predictors::AbstractArray{Symbol}
     x
@@ -23,15 +23,15 @@ function DenseNN(in_dim, out_dim, neurons)
         )
 end
 
-function LinearHybridModel(predictors, x, out_dim, neurons, b=[1.5])
+function LinearHybridModel_canopy(predictors, x, out_dim, neurons, b=[1.5])
     in_dim = length(predictors)
     ch = DenseNN(in_dim, out_dim, neurons)
-    LinearHybridModel(ch, predictors, x, b)
+    LinearHybridModel_canopy(ch, predictors, x, b)
 end
 
 # let's multi dispatch
 
-function (lhm::LinearHybridModel)(df)
+function (lhm::LinearHybridModel_canopy)(df)
     x_matrix = select_predictors(df, lhm.predictors)
 
     α = lhm.DenseLayers(x_matrix)
@@ -43,12 +43,12 @@ function (lhm::LinearHybridModel)(df)
     return (; α, ŷ)
 end
 
-function (lhm::LinearHybridModel)(df, ::Val{:infer})
+function (lhm::LinearHybridModel_canopy)(df, ::Val{:infer})
     α, ŷ =  lhm(df)
     return α, ŷ
 end
 
-function (lhm::LinearHybridModel)(df, infer::Symbol)
+function (lhm::LinearHybridModel_canopy)(df, infer::Symbol)
     α, ŷ = lhm(df, Val(infer))
     return α, ŷ
 end
@@ -86,7 +86,7 @@ end
 
 
 # Call @functor to allow for training the custom model
-Flux.@functor LinearHybridModel
+Flux.@functor LinearHybridModel_canopy
 
 
 # Recurrent model def, overwriting the other (not good of course)

@@ -16,11 +16,11 @@ using Land.CanopyLayers: EVI, FourBandsFittingHybrid, NDVI, NIRv, SIF_WL, SIF_74
 using Land.Photosynthesis: C3CLM, use_clm_td!
 using Land.PlantHydraulics: VanGenuchten, create_tree
 using Land.SoilPlantAirContinuum: CNPP, GPP, PPAR, SPACMono, T_VEG, initialize_spac_canopy!, prescribe_air!, prescribe_swc!, prescribe_t_leaf!, spac_beta_max, update_Cab!, update_LAI!, update_VJRWW!,
-      update_par!, update_sif!, zenith_angle,Canopy_cond
+      update_par!, update_sif!, zenith_angle
 using Land.StomataModels: BetaGLinearPsoil, ESMMedlyn, GswDrive, gas_exchange!, gsw_control!, prognostic_gsw!
 
 
-DF_VARIABLES  = ["F_H2O", "F_CO2", "F_GPP", "SIF683", "SIF740", "SIF757", "SIF771", "NDVI", "EVI", "NIRv","g_lw_pred","T_pred"];
+DF_VARIABLES  = ["F_H2O", "F_CO2", "F_GPP", "SIF683", "SIF740", "SIF757", "SIF771", "NDVI", "EVI", "NIRv","g_lw_pred","T_VEG_pred"];
 
 
 """
@@ -329,8 +329,7 @@ function run_time_step!(spac::SPACMono{FT}, dfr::DataFrameRow, beta::BetaGLinear
     dfr.F_GPP = GPP(spac);
     g_lw_pred, t_veg_pred = Canopy_cond(spac,true)
     dfr.g_lw_pred =  g_lw_pred
-    dfr.T_pred = t_veg_pred 
-    #println(Canopy_cond_un(spac))
+    dfr.T_VEG_pred = t_veg_pred 
     return nothing
 end
 
