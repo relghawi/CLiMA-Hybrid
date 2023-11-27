@@ -12,7 +12,7 @@ wd_file =joinpath(relative_path, "clima_ds_full2.nc")
 df = prepare_wd(dict, wd_file)
 
 # Specify predictors and target based on DataFrame columns
-predictors = [:T_AIR,:SWC_1,:LAIx, :p_sat,:p_H2O,:p_atm,:LA,:vpd]
+predictors = [:T_AIR,:Rad_in,:SWC_1,:LAIx, :p_sat,:p_H2O,:p_atm,:LA,:vpd]
 latents=:g_lw
 target = :F_H2O
 x = [:LAIx, :p_sat,:p_H2O,:p_atm,:LA,:ga_spac] # Assuming as independent variables

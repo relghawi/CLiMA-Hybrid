@@ -8,11 +8,11 @@ using JLD2
 import ProgressMeter: BarGlyphs, next!, Progress
 
 dict = load(joinpath(relative_path, "debug.jld2"))
-wd_file =joinpath(relative_path, "clima_ds_full.nc")
+wd_file =joinpath(relative_path, "clima_ds_full2.nc")
 df = prepare_wd(dict, wd_file)
 
 # Specify predictors and target based on DataFrame columns
-predictors = [:T_AIR, :SWC_1,:LAIx_out_un, :p_sat,:p_H2O,:p_atm,:LA,:vpd]
+predictors = [:T_AIR,:Rad_in, :SWC_1,:LAIx_out_un, :p_sat,:p_H2O,:p_atm,:LA,:vpd]
 latents=:g_lw_un
 target = :T_VEG_un
 x = [:LAIx_out_un, :p_sat,:p_H2O,:p_atm,:LA] # Assuming as independent variables

@@ -6,7 +6,7 @@ include("../DataUtils/losses.jl")
 
 using Flux, JLD2
 
-predictors = [:T_AIR,:SWC_1,:LAIx_out_un, :p_sat,:p_H2O,:p_atm,:LA,:vpd]
+predictors = [:T_AIR,:Rad_in,:SWC_1,:LAIx_out_un, :p_sat,:p_H2O,:p_atm,:LA,:vpd]
 x = [:LAIx_out_un, :p_sat,:p_H2O,:p_atm,:LA] # Assuming as independent variables
 hybrid_model = LinearHybridModel(predictors, x, 1, 128)
 
@@ -46,12 +46,12 @@ function Canopy_cond_un(spac::SPACMono{FT}, Hyb::Bool) where {FT<:AbstractFloat}
         for _i_can in 1:spac.n_canopy
             _iEN = spac.envirs[_i_can];
             _iPS = spac.plant_ps[_i_can];
-
+            _iRAD = spac.in_rad
             vpd = max(FT(0.001), _iPS.p_sat - _iEN.p_H₂O);
             
-            d_vali2 = [_iEN.t_air,spac.swc[1], _iPS.LAIx[1], _iPS.p_sat,_iEN.p_H₂O, _iEN.p_atm, _iPS.LA,vpd]
+            d_vali2 = [_iEN.t_air,_iRAD.E_direct[1],spac.swc[1], _iPS.LAIx[1], _iPS.p_sat,_iEN.p_H₂O, _iEN.p_atm, _iPS.LA,vpd]
 
-            column_names = [:T_AIR,:SWC_1,:LAIx_out_un, :p_sat,:p_H2O,:p_atm,:LA,:vpd]
+            column_names = [:T_AIR,:Rad_in,:SWC_1,:LAIx_out_un, :p_sat,:p_H2O,:p_atm,:LA,:vpd]
             data_matrix = reshape(d_vali2, 1, :)
     
             data_df = DataFrame(data_matrix, Symbol.(column_names))
@@ -89,7 +89,7 @@ include("../DataUtils/data.jl")
 include("../HybridModels/model_64_gc.jl")
 include("../DataUtils/losses.jl")
 
-predictors_gc = [:T_AIR,:SWC_1,:LAIx, :p_sat,:p_H2O,:p_atm,:LA,:vpd]
+predictors_gc = [:T_AIR,:Rad_in,:SWC_1,:LAIx, :p_sat,:p_H2O,:p_atm,:LA,:vpd]
 x_gc = [:LAIx, :p_sat,:p_H2O,:p_atm,:LA,:ga_spac] # Assuming as independent variables
 hybrid_model_gc = LinearHybridModel_canopy(predictors_gc, x_gc, 1, 128)
 
@@ -108,14 +108,15 @@ function Canopy_cond(spac::SPACMono{FT}, Hyb::Bool) where {FT<:AbstractFloat}
         for _i_can in 1:spac.n_canopy
             _iEN = spac.envirs[_i_can];
             _iPS = spac.plant_ps[_i_can];
+            _iRAD = spac.in_rad
 
             LAIx += numerical∫(_iPS.LAIx, _iPS.LAIx)
 
 
             vpd = max(FT(0.001), _iPS.p_sat - _iEN.p_H₂O);
             
-            d_vali2 = [_iEN.t_air,spac.swc[1], LAIx, _iPS.p_sat,_iEN.p_H₂O, _iEN.p_atm, _iPS.LA,vpd,spac.ga]
-            column_names = [:T_AIR,:SWC_1,:LAIx, :p_sat,:p_H2O,:p_atm,:LA,:vpd,:ga_spac]
+            d_vali2 = [_iEN.t_air,_iRAD.E_direct[1],spac.swc[1], LAIx, _iPS.p_sat,_iEN.p_H₂O, _iEN.p_atm, _iPS.LA,vpd,spac.ga]
+            column_names = [:T_AIR,:Rad_in,:SWC_1,:LAIx, :p_sat,:p_H2O,:p_atm,:LA,:vpd,:ga_spac]
             data_matrix = reshape(d_vali2, 1, :)
     
             data_df = DataFrame(data_matrix, Symbol.(column_names))
