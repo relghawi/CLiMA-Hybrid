@@ -20,7 +20,7 @@ library(bigleaf)
 set.seed(75431)
 
 
-df<- read.csv("/Net/Groups/BGI/people/relghawi/Julia_hyb/Clima-Hyb2/Experiments/predictions3.csv") ##hyb-GRA with pft 07 _lossmod gs and df removed from loss without apar, qsat star and s_star
+df<- read.csv("/Net/Groups/BGI/people/relghawi/Julia_hyb/Clima-Hyb2/Experiments/predictions3.csv") 
 
 df <- slice_sample(df,n=200,replace = FALSE )
 
