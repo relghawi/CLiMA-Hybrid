@@ -3,6 +3,8 @@
 # This file is meant for CliMA Land example
 #
 #
+include("hyb_stomatal.jl")
+
 using DataFrames: DataFrame, DataFrameRow
 using Dates: isleapyear
 using JLD2: load
@@ -13,12 +15,12 @@ using PkgUtility: month_days, nanmean
 using Land.CanopyLayers: EVI, FourBandsFittingHybrid, NDVI, NIRv, SIF_WL, SIF_740, fit_soil_mat!
 using Land.Photosynthesis: C3CLM, use_clm_td!
 using Land.PlantHydraulics: VanGenuchten, create_tree
-using Land.SoilPlantAirContinuum: CNPP, GPP, PPAR, SPACMono, T_VEG, initialize_spac_canopy!, prescribe_air!, prescribe_swc!, prescribe_t_leaf!, spac_beta_max, update_Cab!, update_LAI!, update_VJRWW!,
-      update_par!, update_sif!, zenith_angle
+using Land.SoilPlantAirContinuum: CNPP, GPP, PPAR, SPACMono, T_VEG,An_out,LAIx_out,LA_out,p_sat_out,p_H₂O_out,p_atm_out,vpd_out,p_a_out,gamma_out,p_s_out,p_i_out, initialize_spac_canopy!, prescribe_air!, prescribe_swc!, prescribe_t_leaf!, spac_beta_max, update_Cab!, update_LAI!, update_VJRWW!,
+      update_par!, update_sif!, zenith_angle,gsw_ss_out,g_sw_out,g_bw_out,tao_esm_out,g_sw0_out,ga_spac,LAIx_out_un, Rad_in #,Rad_out,Rad_out_un
 using Land.StomataModels: BetaGLinearPsoil, ESMMedlyn, GswDrive, gas_exchange!, gsw_control!, prognostic_gsw!
 
 
-DF_VARIABLES  = ["F_H2O", "F_CO2", "F_GPP", "SIF683", "SIF740", "SIF757", "SIF771", "NDVI", "EVI", "NIRv"];
+DF_VARIABLES  = ["F_H2O", "F_CO2", "F_GPP", "SIF683", "SIF740", "SIF757", "SIF771", "NDVI", "EVI", "NIRv","g_lw","T_VEG","An","LAIx","LA","p_sat","p_H2O","vpd","p_atm","gamma_out","p_s_out","p_i_out","beta_m","p_a","gsw_ss","g_sw","g_bw","tao_out","g_sw0","ga_spac","LAIx_out_un","g_lw_un","T_VEG_un","Rad_in"];
 
 
 """
@@ -39,6 +41,7 @@ function prepare_wd(dict::Dict, wd_file::String)
     _df_in[!,"LAI"]         .= 0.0;
     _df_in[!,"Vcmax"]       .= 0.0;
     _df_in[!,"T_MEAN"]      .= 0.0;
+
     for _i in eachindex(_df_in.T_MEAN)
         if _i < 240
             _df_in[_i,"T_MEAN"] = nanmean( max.(_df_in.T_AIR[1:_i], _df_in.T_LEAF[1:_i]) );
@@ -72,6 +75,7 @@ function prepare_wd(dict::Dict, wd_file::String)
 
         return repeat(_dat_1d; inner = 24)
     );
+    println(size(_df_in[!,"CO2"]))
     _df_in[!,"CO2"]         .= nt_to_1h("co2_concentration");
     _df_in[!,"Chlorophyll"] .= nt_to_1h("chlorophyll");
     _df_in[!,"CI"]          .= nt_to_1h("clumping_index");
@@ -138,7 +142,7 @@ function prepare_spac(dict::Dict; FT = Float64)
     # set up empirical model
     if typeof(_sm) <: ESMMedlyn
         _node.photo_set = C3CLM(FT);
-        _node.stomata_model.g1 = dict["g1_medlyn_c3"];
+        _node.stomata_model.g1 = 0.005;
         _node.stomata_model.g0 = 1e-3;
     else
         @warn "Stomatal model parameters are not initialized for $(typeof(_sm))";
@@ -322,6 +326,35 @@ function run_time_step!(spac::SPACMono{FT}, dfr::DataFrameRow, beta::BetaGLinear
     end;
 
     # save the total flux into the DataFrame
+
+    dfr.LAIx_out_un=LAIx_out_un(spac)
+    dfr.ga_spac=ga_spac(spac)
+    dfr.tao_out=tao_esm_out(spac);
+    dfr.gsw_ss=gsw_ss_out(spac);
+    dfr.g_sw=g_sw_out(spac)
+    dfr.g_sw0=g_sw0_out(spac)
+    dfr.g_bw=g_bw_out(spac)
+    dfr.beta_m=_βm
+    dfr.vpd=vpd_out(spac);
+    # dfr.Rad_out=Rad_out(spac)
+    # dfr.Rad_out_un=Rad_out_un(spac)
+    g_lw, t_veg = Canopy_cond(spac,false)
+    dfr.T_VEG = t_veg
+    dfr.g_lw = g_lw
+    g_lw_un, t_veg_un  =Canopy_cond_un(spac,false);
+    dfr.g_lw_un =  g_lw_un
+    dfr.T_VEG_un=t_veg_un
+    dfr.Rad_in=Rad_in(spac)
+    dfr.An = An_out(spac);  
+    dfr.LAIx= LAIx_out(spac);
+    dfr.LA=LA_out(spac);
+    dfr.p_sat= p_sat_out(spac);
+    dfr.p_H2O=p_H₂O_out(spac);
+    dfr.p_atm=p_atm_out(spac);
+    dfr.p_a=p_a_out(spac);
+    dfr.gamma_out=gamma_out(spac);
+    dfr.p_i_out=p_i_out(spac);
+    dfr.p_s_out=p_s_out(spac);
     dfr.F_H2O = T_VEG(spac);
     dfr.F_CO2 = CNPP(spac);
     dfr.F_GPP = GPP(spac);
@@ -362,7 +395,8 @@ function run_model!(spac::SPACMono{FT}, df::DataFrame, nc_out::String) where {FT
     return nothing
 end
 
-@time dict = load(joinpath(@__DIR__, "debug.jld2"));
-@time wddf = prepare_wd(dict, joinpath(@__DIR__, "debug.nc"));
+
+@time dict = load(joinpath(@__DIR__,"debug.jld2"));
+@time wddf = prepare_wd(dict, "/Net/Groups/BGI/scratch/relghawi/paper_2/Ozark_2012.nc");
 @time spac = prepare_spac(dict);
-@time run_model!(spac, wddf, joinpath(@__DIR__, "debug.output1.nc"));
+@time run_model!(spac, wddf, joinpath(@__DIR__, "debug.output_oz.nc"));

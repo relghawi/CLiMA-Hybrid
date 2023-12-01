@@ -27,6 +27,19 @@ function select_predictors(df::KeyedArray, predictors)
     return df(predictors) |> Matrix
 end
 
+function select_predictors_as_dataframe(data, predictors)
+    if isa(data, AbstractDataFrame)
+        # If data is a DataFrame, select columns based on predictors and return a DataFrame
+        return select(data, predictors)
+    elseif isa(data, DataFrameRow)
+        # If data is a DataFrameRow, convert it to a DataFrame, select columns, and return a DataFrame
+        df = DataFrame(data)
+        return select(df, predictors)
+    else
+        throw(ArgumentError("Input data type not supported"))
+    end
+end
+
 function select_cols(df::KeyedArray, predictors, x)
     # Merge predictors and x while ensuring uniqueness
     all_variables = unique([predictors..., x])
@@ -74,6 +87,16 @@ end
 function select_cols(df, predictors, x)
     # Merge predictors and x while ensuring uniqueness
     all_variables = union(predictors, x)
+
+    # Select the desired columns from the DataFrame
+    selected_df = select(df, all_variables)
+
+    return selected_df
+end
+
+function select_cols(df, predictors,latents, x)
+    # Merge predictors and x while ensuring uniqueness
+    all_variables = union(predictors,latents, x)
 
     # Select the desired columns from the DataFrame
     selected_df = select(df, all_variables)
@@ -140,6 +163,38 @@ function split_data(df, target, predictors, x; f = 0.8, v = 0.1, batchsize=32, s
     df_test = tokeyedArray(df_test)
     y_test = getproperty(d_test, target)
     data_test = (; df = df_test, y = y_test)
+    testloader = Flux.DataLoader(data_test; batchsize=length(y_test), shuffle=false, partial=false)
+    
+    return trainloader, valloader, testloader, trainall, d_train, d_vali, d_test
+end
+
+function split_data(df, target, predictors,latents, x; f = 0.8, v = 0.1, batchsize=32, shuffle=true, partial=true)
+    d_train, d_temp = partition(df, f; shuffle)
+    d_vali, d_test = partition(d_temp, v / (1 - f); shuffle)
+    
+    # Wrap training data into Flux.DataLoader
+    df_train = select_cols(d_train, predictors, x)
+    df_train = tokeyedArray(df_train)
+    y_train = getproperty(d_train, target)
+    latent_train =getproperty(d_train, latents)
+    data_train = (; df = df_train, y = y_train,latent=latent_train)
+    trainloader = Flux.DataLoader(data_train; batchsize, shuffle, partial)
+    trainall = Flux.DataLoader(data_train; batchsize=length(y_train), shuffle, partial)
+    
+    # Wrap validation data into Flux.DataLoader
+    df_vali = select_cols(d_vali, predictors, x)
+    df_vali = tokeyedArray(df_vali)
+    y_vali = getproperty(d_vali, target)
+    latent_vali =getproperty(d_vali, latents)
+    data_vali = (; df = df_vali, y = y_vali,latent=latent_vali)
+    valloader = Flux.DataLoader(data_vali; batchsize=length(y_vali), shuffle=false, partial=false)
+    
+    # Wrap test data into Flux.DataLoader
+    df_test = select_cols(d_test, predictors, x)
+    df_test = tokeyedArray(df_test)
+    y_test = getproperty(d_test, target)
+    latent_test =getproperty(d_test, latents)
+    data_test = (; df = df_test, y = y_test,latent=latent_test)
     testloader = Flux.DataLoader(data_test; batchsize=length(y_test), shuffle=false, partial=false)
     
     return trainloader, valloader, testloader, trainall, d_train, d_vali, d_test

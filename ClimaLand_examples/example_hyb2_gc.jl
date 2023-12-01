@@ -17,10 +17,10 @@ using Land.Photosynthesis: C3CLM, use_clm_td!
 using Land.PlantHydraulics: VanGenuchten, create_tree
 using Land.SoilPlantAirContinuum: CNPP, GPP, PPAR, SPACMono, T_VEG, initialize_spac_canopy!, prescribe_air!, prescribe_swc!, prescribe_t_leaf!, spac_beta_max, update_Cab!, update_LAI!, update_VJRWW!,
       update_par!, update_sif!, zenith_angle
-using Land.StomataModels: BetaGLinearPsoil, ESMMedlynHybrid, GswDrive, gas_exchange!, gsw_control!, prognostic_gsw!
+using Land.StomataModels: BetaGLinearPsoil, ESMMedlyn, GswDrive, gas_exchange!, gsw_control!, prognostic_gsw!
 
 
-DF_VARIABLES  = ["F_H2O", "F_CO2", "F_GPP", "SIF683", "SIF740", "SIF757", "SIF771", "NDVI", "EVI", "NIRv"];
+DF_VARIABLES  = ["F_H2O", "F_CO2", "F_GPP", "SIF683", "SIF740", "SIF757", "SIF771", "NDVI", "EVI", "NIRv","g_lw_pred","T_VEG_pred"];
 
 
 """
@@ -103,7 +103,7 @@ function prepare_spac(dict::Dict; FT = Float64)
     # read general information from dict
     _lat = dict["latitude"];
     _lon = dict["longitude"]
-    _sm = ESMMedlynHybrid{FT}();
+    _sm = ESMMedlyn{FT}();
 
     # use JULES soil depth 0.00 -- 0.10 -- 0.35 -- 1.00 -- 3.00 m, and assume 2 m deep root (z_root = -2) for all the sites
     _soil_bounds = FT[0, -0.1, -0.35, -1, -3];
@@ -138,7 +138,7 @@ function prepare_spac(dict::Dict; FT = Float64)
     end;
 
     # set up empirical model
-    if typeof(_sm) <: ESMMedlynHybrid
+    if typeof(_sm) <: ESMMedlyn
         _node.photo_set = C3CLM(FT);
         _node.stomata_model.g1 = dict["g1_medlyn_c3"];
         _node.stomata_model.g0 = 1e-3;
@@ -267,8 +267,8 @@ Wrapper function to use prognostic_gsw!, given
 - `β` Tuning factor
 
 """
-function update_gsw!(spac::SPACMono{FT}, sm::ESMMedlynHybrid{FT}, ind::Int, δt::FT; swc::FT,β::FT = FT(1)) where {FT<:AbstractFloat}
-    prognostic_gsw!(spac.plant_ps[ind], spac.envirs[ind], sm,swc, β, δt);
+function update_gsw!(spac::SPACMono{FT}, sm::ESMMedlyn{FT}, ind::Int, δt::FT; swc::FT,β::FT = FT(1)) where {FT<:AbstractFloat}
+    prognostic_gsw!(spac.plant_ps[ind], spac.envirs[ind], sm,swc, β, δt); #,true
 
     return nothing
 end
@@ -327,7 +327,9 @@ function run_time_step!(spac::SPACMono{FT}, dfr::DataFrameRow, beta::BetaGLinear
     dfr.F_H2O = T_VEG(spac);
     dfr.F_CO2 = CNPP(spac);
     dfr.F_GPP = GPP(spac);
-
+    g_lw_pred, t_veg_pred = Canopy_cond(spac,true)
+    dfr.g_lw_pred =  g_lw_pred
+    dfr.T_VEG_pred = t_veg_pred 
     return nothing
 end
 
@@ -370,4 +372,4 @@ end
 @time wddf = prepare_wd(dict, joinpath(@__DIR__, "debug.nc"), DF_VARIABLES);
 @time spac = prepare_spac(dict);
 # the actual test !
-@time run_model!(spac, wddf, joinpath(@__DIR__, "debug.output3.nc"));
+@time run_model!(spac, wddf, joinpath(@__DIR__, "debug.outputgc.nc"));
