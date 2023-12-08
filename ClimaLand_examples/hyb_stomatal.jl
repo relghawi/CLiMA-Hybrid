@@ -5,13 +5,23 @@ include("../HybridModels/model_64.jl")
 include("../DataUtils/losses.jl")
 
 using Flux, JLD2
+### for example
+# predictors = [:T_AIR,:Rad_in,:SWC_1,:LAIx_out_un, :p_sat,:p_H2O,:p_atm,:LA,:vpd]
+# x = [:LAIx_out_un, :p_sat,:p_H2O,:p_atm,:LA] # Assuming as independent variables
+# hybrid_model = LinearHybridModel(predictors, x, 1, 128)
 
-predictors = [:T_AIR,:Rad_in,:SWC_1,:LAIx_out_un, :p_sat,:p_H2O,:p_atm,:LA,:vpd]
+# model_state_path = joinpath(@__DIR__, "hybrid_clima.jld2")
+# model_state = JLD2.load(model_state_path, "model_state")
+
+### example oz
+
+predictors = [:T_AIR,:Rad_in, :SWC,:LAIx_out_un, :p_sat,:p_H2O,:p_atm,:LA,:vpd]
 x = [:LAIx_out_un, :p_sat,:p_H2O,:p_atm,:LA] # Assuming as independent variables
 hybrid_model = LinearHybridModel(predictors, x, 1, 128)
 
-model_state_path = joinpath(@__DIR__, "hybrid_clima.jld2")
+model_state_path = joinpath(@__DIR__, "hybrid_clima_oz.jld2")
 model_state = JLD2.load(model_state_path, "model_state")
+
 
 Flux.loadmodel!(hybrid_model, model_state)
 
@@ -51,7 +61,8 @@ function Canopy_cond_un(spac::SPACMono{FT}, Hyb::Bool) where {FT<:AbstractFloat}
             
             d_vali2 = [_iEN.t_air,_iRAD.E_direct[1],spac.swc[1], _iPS.LAIx[1], _iPS.p_sat,_iEN.p_H₂O, _iEN.p_atm, _iPS.LA,vpd]
 
-            column_names = [:T_AIR,:Rad_in,:SWC_1,:LAIx_out_un, :p_sat,:p_H2O,:p_atm,:LA,:vpd]
+            #column_names = [:T_AIR,:Rad_in,:SWC_1,:LAIx_out_un, :p_sat,:p_H2O,:p_atm,:LA,:vpd] ##example
+            column_names = [:T_AIR,:Rad_in,:SWC,:LAIx_out_un, :p_sat,:p_H2O,:p_atm,:LA,:vpd] ##example oz site
             data_matrix = reshape(d_vali2, 1, :)
     
             data_df = DataFrame(data_matrix, Symbol.(column_names))
@@ -89,12 +100,23 @@ include("../DataUtils/data.jl")
 include("../HybridModels/model_64_gc.jl")
 include("../DataUtils/losses.jl")
 
-predictors_gc = [:T_AIR,:Rad_in,:SWC_1,:LAIx, :p_sat,:p_H2O,:p_atm,:LA,:vpd]
+## for example site
+# predictors_gc = [:T_AIR,:Rad_in,:SWC_1,:LAIx, :p_sat,:p_H2O,:p_atm,:LA,:vpd]
+# x_gc = [:LAIx, :p_sat,:p_H2O,:p_atm,:LA,:ga_spac] # Assuming as independent variables
+# hybrid_model_gc = LinearHybridModel_canopy(predictors_gc, x_gc, 1, 128)
+
+# model_state_path_gc = joinpath(@__DIR__, "hybrid_clima_gc.jld2")
+# model_state_gc = JLD2.load(model_state_path_gc, "model_state")
+
+### for oz site
+
+predictors_gc = [:T_AIR,:Rad_in,:SWC,:LAIx, :p_sat,:p_H2O,:p_atm,:LA,:vpd]
 x_gc = [:LAIx, :p_sat,:p_H2O,:p_atm,:LA,:ga_spac] # Assuming as independent variables
 hybrid_model_gc = LinearHybridModel_canopy(predictors_gc, x_gc, 1, 128)
 
-model_state_path_gc = joinpath(@__DIR__, "hybrid_clima_gc.jld2")
+model_state_path_gc = joinpath(@__DIR__, "hybrid_clima_gc_oz.jld2")
 model_state_gc = JLD2.load(model_state_path_gc, "model_state")
+
 
 Flux.loadmodel!(hybrid_model_gc, model_state_gc)
 
@@ -116,13 +138,15 @@ function Canopy_cond(spac::SPACMono{FT}, Hyb::Bool) where {FT<:AbstractFloat}
             vpd = max(FT(0.001), _iPS.p_sat - _iEN.p_H₂O);
             
             d_vali2 = [_iEN.t_air,_iRAD.E_direct[1],spac.swc[1], LAIx, _iPS.p_sat,_iEN.p_H₂O, _iEN.p_atm, _iPS.LA,vpd,spac.ga]
-            column_names = [:T_AIR,:Rad_in,:SWC_1,:LAIx, :p_sat,:p_H2O,:p_atm,:LA,:vpd,:ga_spac]
+            #column_names = [:T_AIR,:Rad_in,:SWC_1,:LAIx, :p_sat,:p_H2O,:p_atm,:LA,:vpd,:ga_spac] ##example
+            column_names = [:T_AIR,:Rad_in,:SWC,:LAIx, :p_sat,:p_H2O,:p_atm,:LA,:vpd,:ga_spac] ##oz site
             data_matrix = reshape(d_vali2, 1, :)
     
             data_df = DataFrame(data_matrix, Symbol.(column_names))
     
             α, ŷ = hybrid_model_gc(data_df, Val(:infer))
             _g_lw = α[1]
+
             _t_veg = (_g_lw .* (_iPS.p_sat - _iEN.p_H₂O) ./ _iEN.p_atm .* _iPS.LA) ./ spac.ga;
     
         end
@@ -158,7 +182,7 @@ function prognostic_gsw!(clayer::CanopyLayer{FT}, envir::AirLayer{FT}, sm::Empir
 
     if Hyb
         d_vali2 = [t_air, Rn[1], swc, LAIx[1], p_sat, p_H₂O, p_atm, LA,wind,vpd]
-        column_names = [:T_AIR, :RAD, :SWC_1,:LAIx, :p_sat,:p_H2O,:p_atm,:LA,:WIND,:vpd]
+        column_names = [:T_AIR, :RAD, :SWC_1,:LAIx, :p_sat,:p_H2O,:p_atm,:LA,:WIND,:vpd] ##example
         data_matrix = reshape(d_vali2, 1, :)
         # println("LAIx prog")
         # println(LAIx)

@@ -77,6 +77,7 @@ function prepare_wd(dict::Dict, wd_file::String)
     _df_in[!,"CO2"]         .= nt_to_1h("co2_concentration");
     _df_in[!,"Chlorophyll"] .= nt_to_1h("chlorophyll");
     _df_in[!,"CI"]          .= nt_to_1h("clumping_index");
+    println(_df_in[!,"CI"])
     _df_in[!,"LAI"]         .= nt_to_1h("leaf_area_index");
     _df_in[!,"Vcmax"]       .= nt_to_1h("vcmax");
 
